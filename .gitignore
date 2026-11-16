@@ -60,7 +60,10 @@ dmypy.json
 .idea/
 .cursor/
 .gemini/
-.claude/
+.claude/*
+!.claude/skills/
+!.claude/agents/
+!.claude/PSTACK_LICENSE
 .windsurf/
 .cline/
 .roo/
