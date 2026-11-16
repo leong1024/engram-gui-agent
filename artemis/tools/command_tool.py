@@ -594,6 +594,13 @@ class RunAdbCommandArgs(BaseModel):
     )
 
 
+def _note_adb_command(ctx: ArtemisContext | None, cmd_line: str) -> None:
+    """Lets the step recorder drop app versions an install or uninstall may change."""
+    app_versions = getattr(getattr(ctx, "data_engine", None), "app_versions", None)
+    if app_versions is not None:
+        app_versions.note_adb_command(cmd_line)
+
+
 def _build_phone_script(
     cmd_line: str,
     cwd: str,
@@ -651,6 +658,7 @@ class RunAdbCommandTool(ArtemisTool):
             if CommandLine is not None
             else (kwargs.get("command_line") or kwargs.get("command") or kwargs.get("cmd") or "")
         )
+        _note_adb_command(ctx, cmd_line)
         cwd = Cwd or kwargs.get("cwd") or "/data/local/tmp"
         run_persistent = (
             RunPersistent if RunPersistent is not False else kwargs.get("run_persistent", False)
@@ -1063,6 +1071,7 @@ class RunShortAdbCommandTool(ArtemisTool):
             if CommandLine is not None
             else (kwargs.get("command_line") or kwargs.get("command") or kwargs.get("cmd") or "")
         )
+        _note_adb_command(ctx, cmd_line)
         timeout = _SHORT_COMMAND_TIMEOUT_SECONDS
 
         # Fallback to driver's execute_shell if no full ArtemisContext is available

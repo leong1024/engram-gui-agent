@@ -102,6 +102,7 @@ async def observe(
                 ui_tree=xml_hierarchy,
                 ocr_result=ocr_results,
             )
+            ctx.data_engine.note_observed_screen(image_name, device_data, xml_hierarchy)
             screenshot_path = str(ctx.data_engine.get_image_path(image_name))
         except Exception as e:
             logger.error(f"Failed to save image in DataEngine: {e}")
