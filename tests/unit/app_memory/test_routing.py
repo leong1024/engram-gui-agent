@@ -102,6 +102,15 @@ def test_ties_go_to_the_more_recently_seen_route(build):
     assert route_from(build, "Home", display).hops[0].to_state.title == "New"
 
 
+def test_recency_never_outweighs_reliability(build):
+    home, stale, fresh, display = (build.state(n) for n in ("Home", "Stale", "Fresh", "Display"))
+    build.edge(home, stale, tap("Stale"), confirmed=9, seen_at=NOW - 10_000_000)
+    build.edge(stale, display, tap("Display"), confirmed=9, seen_at=NOW - 10_000_000)
+    build.edge(home, fresh, tap("Fresh"), confirmed=1, no_effect=1)
+    build.edge(fresh, display, tap("Display"), confirmed=1, no_effect=1)
+    assert route_from(build, "Home", display).hops[0].to_state.title == "Stale"
+
+
 @pytest.mark.parametrize(("length", "kind"), [(15, RouteKind.FROM_STATE), (16, RouteKind.NO_PATH)])
 def test_routes_stop_at_fifteen_hops(build, length, kind):
     chain = [build.state(f"Page {chr(97 + i)}") for i in range(length + 1)]

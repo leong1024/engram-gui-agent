@@ -53,6 +53,7 @@ and waits for the operator's go.
 | [0007](decisions/0007-in-process-graph-injected.md) | In-process library; the graph injects routes, not an agent tool. |
 | [0008](decisions/0008-advisory-hints.md) | Routes are advisory, with a screen signature per hop. |
 | [0009](decisions/0009-no-measurement-phase-1.md) | No measurement harness in phase 1; an on/off switch only. |
+| [0010](decisions/0010-rustworkx-for-routing.md) | Dijkstra through rustworkx, graph built once per planner. |
 
 ## Depends on
 
