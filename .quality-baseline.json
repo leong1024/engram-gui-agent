@@ -1,5 +1,7 @@
 {
+  "app_memory_long_functions": 0,
   "broad_exception_handlers": 754,
+  "long_functions": 111,
   "silent_broad_exception_handlers": 0,
   "type_ignore_comments": 18
 }

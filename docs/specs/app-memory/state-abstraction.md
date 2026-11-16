@@ -104,6 +104,17 @@ map:
 `cluster_ordinal` in the `state_id` (see [data-model](data-model.md)) separates distinct states
 that share a coarse key but failed fuzzy matching against each other.
 
+## Implementation notes (P2)
+
+- `ScreenObservation` also carries an optional `screen_size`. Without it, "outside the screen"
+  cannot be checked and only elements with empty or negative bounds are dropped.
+- Fuzzy matching only compares screens whose overlay and tab markers are equal. Otherwise a dialog
+  over a page scores at least 0.80 against the bare page and wrongly matches it.
+- Overlays are detected from the dialog class and tabs from the selected tab label. Helper window
+  metadata is not used yet.
+- A text field's hint is read from an optional `hint` or `hint-text` key. UIAutomator dumps have
+  none, so the hint is lost for them.
+
 ## Contracts
 
 - `abstract(observation) -> AbstractScreen` is pure and deterministic. The same input always
