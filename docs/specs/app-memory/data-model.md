@@ -7,6 +7,8 @@ depends_on:
   - decisions/0006-embedded-vector-index.md
 code:
   - artemis/app_memory/store.py
+  - artemis/app_memory/queries.py
+  - artemis/app_memory/rows.py
 ---
 
 # Data model
@@ -123,6 +125,18 @@ action_signature)`.
 
 Changing the configured model creates a new `vec_` table. Old vectors are kept until a re-embed
 job fills the new one. Retrieval only reads the current model's table.
+
+## Implementation notes (P3)
+
+- `put_state` takes an optional sample and writes `sample_session_id`, `sample_step_id` and
+  `sample_image_sha` on first insert only. `visit_count` is not maintained yet.
+- The observation of an entry edge has the step id with an `@entry` suffix, so a step that
+  enters another app has two observations.
+- `finalize_session` settles only `provisional` observations, refreshes the counts of the
+  session's edges and keeps the first `outcome` and `finalized_at`.
+- `map_stats` counts states and edges per `app_versions` row, and observations by the map of
+  their source state, so no-effect observations count too.
+- Row mapping lives in `rows.py`. `store.py` keeps every statement that touches the database.
 
 ## Contracts
 

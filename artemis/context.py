@@ -30,6 +30,7 @@ except ImportError:
     AdbClient = Any
 
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr
+from artemis.app_memory.interface import NoopAppMemory
 from artemis.utils.video import detect_video_tools_enabled
 
 
@@ -190,6 +191,10 @@ class ArtemisContext(DeviceClientAccessors, BaseModel):
     ``artemis.memory.ensure_step_memory``; Flash and Pro profiles share one
     instance so summary jobs, retries, and flush semantics are unified."""
 
+    app_memory: Any = Field(default_factory=NoopAppMemory)
+    """Run's :class:`~artemis.app_memory.interface.AppMemoryService`; no-op until the SDK
+    opens it after the DataEngine session starts."""
+
     transcript_ledger: Any | None = None
     """Session :class:`~artemis.memory.transcript.TranscriptLedger` for the Pro
     operator's transcript prompt path (``agent.memory.transcript.enabled``).
@@ -277,6 +282,7 @@ class ArtemisContext(DeviceClientAccessors, BaseModel):
                 self.mcp_client_ctx = None
                 self.mcp_session = None
 
+        await self.app_memory.close()
         if self.data_engine:
             try:
                 await self.data_engine.shutdown()

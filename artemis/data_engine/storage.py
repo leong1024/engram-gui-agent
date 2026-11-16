@@ -817,6 +817,12 @@ class StorageManager:
                 )
             conn.commit()
 
+    def session_ids(self) -> list[str]:
+        """Every recorded session id, oldest first."""
+        with self._get_connection() as conn:
+            rows = conn.execute("SELECT session_id FROM sessions ORDER BY start_time, session_id")
+            return [str(row["session_id"]) for row in rows]
+
     def get_session(self, session_id: UUID | str) -> SessionMetadata | None:
         """Retrieve a session by ID."""
         with self._get_connection() as conn:

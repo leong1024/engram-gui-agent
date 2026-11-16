@@ -1,7 +1,6 @@
 import json
 import sqlite3
 from collections.abc import Iterable, Iterator, Sequence
-from typing import Any
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -16,8 +15,19 @@ from artemis.app_memory.models import (
     EmbeddingModel,
     KnownState,
     MapId,
+    MapStats,
     ObservationRecord,
+    ObservationStatus,
+    SessionOutcome,
     StateId,
+    StateSample,
+)
+from artemis.app_memory.rows import (
+    map_key,
+    observation_params,
+    screen_from_row,
+    state_params,
+    stats_from_row,
 )
 
 BUSY_TIMEOUT_MS = 30_000
@@ -63,22 +73,28 @@ class MapStore:
                 conn.execute(statement)
 
     def put_state(
-        self, map_id: MapId, state_id: StateId, screen: AbstractScreen, now: float
+        self,
+        map_id: MapId,
+        state_id: StateId,
+        screen: AbstractScreen,
+        now: float,
+        sample: StateSample | None = None,
     ) -> None:
+        params = state_params(map_id, state_id, screen, now, sample)
         with self._transaction() as conn:
             _touch_version(conn, map_id, now)
-            conn.execute(queries.UPSERT_STATE, _state_params(map_id, state_id, screen, now))
+            conn.execute(queries.UPSERT_STATE, params)
 
     def put_outside_state(self, map_id: MapId, now: float) -> StateId:
         state_id = ids.outside_state_id(map_id)
         with self._transaction() as conn:
             _touch_version(conn, map_id, now)
-            conn.execute(queries.INSERT_OUTSIDE, (state_id, *_map_key(map_id), now, now))
+            conn.execute(queries.INSERT_OUTSIDE, (state_id, *map_key(map_id), now, now))
         return state_id
 
     def known_states(self, map_id: MapId) -> list[KnownState]:
-        rows = self._conn.execute(queries.SELECT_STATES, _map_key(map_id)).fetchall()
-        return [KnownState(StateId(row[0]), _screen_from_row(row[1:])) for row in rows]
+        rows = self._conn.execute(queries.SELECT_STATES, map_key(map_id)).fetchall()
+        return [KnownState(StateId(row[0]), screen_from_row(row[1:])) for row in rows]
 
     def put_edge(
         self,
@@ -93,7 +109,7 @@ class MapStore:
         payload = json.dumps([a.as_dict() for a in actions], sort_keys=True)
         with self._transaction() as conn:
             conn.execute(
-                queries.UPSERT_EDGE, (edge_id, *_map_key(map_id), src, dst, signature, payload, now)
+                queries.UPSERT_EDGE, (edge_id, *map_key(map_id), src, dst, signature, payload, now)
             )
         return edge_id
 
@@ -102,9 +118,35 @@ class MapStore:
             previous = conn.execute(
                 queries.SELECT_OBSERVED_EDGE, (record.session_id, record.step_id)
             ).fetchone()
-            conn.execute(queries.UPSERT_OBSERVATION, _observation_params(record))
+            conn.execute(queries.UPSERT_OBSERVATION, observation_params(record))
             touched = {record.edge_id, previous[0] if previous else None}
             _refresh_counts(conn, touched)
+
+    def observed_steps(self, session_id: str) -> set[str]:
+        rows = self._conn.execute(queries.SELECT_OBSERVED_STEPS, (session_id,))
+        return {row[0] for row in rows}
+
+    def open_session(self, session_id: str) -> None:
+        with self._transaction() as conn:
+            conn.execute(queries.INSERT_LIVE_SESSION, (session_id,))
+
+    def finalize_session(
+        self, session_id: str, outcome: SessionOutcome, status: ObservationStatus, now: float
+    ) -> None:
+        with self._transaction() as conn:
+            conn.execute(queries.SETTLE_OBSERVATIONS, (status.value, session_id))
+            edges = conn.execute(queries.SELECT_SESSION_EDGES, (session_id,)).fetchall()
+            _refresh_counts(conn, (row[0] for row in edges))
+            conn.execute(queries.FINALIZE_SESSION, (session_id, outcome.value, now))
+
+    def live_sessions(self) -> list[str]:
+        return [row[0] for row in self._conn.execute(queries.SELECT_LIVE_SESSIONS)]
+
+    def last_activity(self, session_id: str) -> float | None:
+        return self._conn.execute(queries.SELECT_LAST_ACTIVITY, (session_id,)).fetchone()[0]
+
+    def map_stats(self) -> list[MapStats]:
+        return [stats_from_row(row) for row in self._conn.execute(queries.SELECT_MAP_STATS)]
 
     def rebuild_counts(self) -> None:
         with self._transaction() as conn:
@@ -144,55 +186,10 @@ def _load_vector_extension(conn: sqlite3.Connection) -> None:
         raise VectorExtensionError(f"sqlite-vec could not be loaded: {exc}") from exc
 
 
-def _map_key(map_id: MapId) -> tuple[str, int]:
-    return map_id.package, map_id.version_code
-
-
 def _touch_version(conn: sqlite3.Connection, map_id: MapId, now: float) -> None:
-    conn.execute(queries.TOUCH_VERSION, (*_map_key(map_id), now, now))
-
-
-def _state_params(
-    map_id: MapId, state_id: StateId, screen: AbstractScreen, now: float
-) -> tuple[object, ...]:
-    return (
-        state_id,
-        *_map_key(map_id),
-        screen.activity,
-        screen.coarse_key,
-        json.dumps(screen.skeleton),
-        json.dumps(sorted(screen.static_tokens)),
-        screen.is_opaque,
-        screen.dhash,
-        now,
-        now,
-    )
-
-
-def _screen_from_row(row: Sequence[Any]) -> AbstractScreen:
-    activity, coarse_key, skeleton, static_tokens, is_opaque, dhash = row
-    return AbstractScreen(
-        activity=activity,
-        coarse_key=coarse_key,
-        skeleton=tuple(json.loads(skeleton)),
-        static_tokens=frozenset(json.loads(static_tokens)),
-        is_opaque=bool(is_opaque),
-        dhash=dhash,
-    )
+    conn.execute(queries.TOUCH_VERSION, (*map_key(map_id), now, now))
 
 
 def _refresh_counts(conn: sqlite3.Connection, edge_ids: Iterable[str | None]) -> None:
     for edge_id in {e for e in edge_ids if e is not None}:
         conn.execute(f"{schema.REBUILD_COUNTS} WHERE edge_id = ?", (edge_id,))
-
-
-def _observation_params(record: ObservationRecord) -> tuple[object, ...]:
-    return (
-        record.session_id,
-        record.step_id,
-        record.edge_id,
-        record.src_state_id,
-        record.action_signature,
-        record.status.value,
-        record.recorded_at,
-    )
