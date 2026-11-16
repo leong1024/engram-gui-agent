@@ -9,6 +9,9 @@ code:
   - artemis/app_memory/store.py
   - artemis/app_memory/queries.py
   - artemis/app_memory/rows.py
+  - artemis/app_memory/transaction.py
+  - artemis/app_memory/document_store.py
+  - artemis/app_memory/document_queries.py
 ---
 
 # Data model

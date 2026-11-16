@@ -49,11 +49,6 @@ ON CONFLICT (session_id, step_id) DO UPDATE SET
 
 SELECT_COUNTS = "SELECT confirmed_n, discounted_n, provisional_n FROM edges WHERE edge_id = ?"
 
-INSERT_MODEL = """
-INSERT INTO embedding_models (model_id, provider, model, dim) VALUES (?, ?, ?, ?)
-ON CONFLICT (model_id) DO NOTHING
-"""
-
 SELECT_OBSERVED_STEPS = "SELECT step_id FROM observations WHERE session_id = ?"
 
 INSERT_LIVE_SESSION = """

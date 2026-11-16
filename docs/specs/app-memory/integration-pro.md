@@ -20,7 +20,9 @@ code:
   - artemis/agents/operator/prompts.py
   - artemis/config/agent.py
   - artemis/config/llm.py
+  - artemis/config/constants.py
   - config/artemis.jsonc
+  - artemis/resources/config/artemis.jsonc
   - artemis/interfaces/cli/main.py
   - artemis/interfaces/cli/commands/app_memory.py
   - third_party/mobile_use/sdk/agent.py

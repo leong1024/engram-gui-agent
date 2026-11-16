@@ -15,6 +15,7 @@ code:
   - artemis/app_memory/outcomes.py
   - artemis/app_memory/trace_reader.py
   - artemis/app_memory/describer.py
+  - artemis/app_memory/enrichment.py
   - artemis/data_engine/engine.py
   - artemis/data_engine/storage.py
   - artemis/interfaces/cli/commands/app_memory.py

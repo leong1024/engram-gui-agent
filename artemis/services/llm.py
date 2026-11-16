@@ -20,7 +20,7 @@ thought stream recording, and role-based dynamic dispatching.
 
 import asyncio
 from collections.abc import Awaitable, Callable, Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar, Token
 import functools
 import logging
@@ -961,6 +961,17 @@ def _get_llm(
 get_llm: GetLLM = _get_llm
 
 
+@contextmanager
+def raise_when_exhausted() -> Iterator[None]:
+    """Calls in this scope raise LLMExhaustedError when retries run out instead of pausing
+    the task. Background jobs use it: only the agent's own calls may pause a run."""
+    token = _FALLBACK_AVAILABLE.set(True)
+    try:
+        yield
+    finally:
+        _FALLBACK_AVAILABLE.reset(token)
+
+
 class _ObservedFallback(FallbackRunner):
     """Fall back only on failures another endpoint could fix, and record it.
 
@@ -971,15 +982,10 @@ class _ObservedFallback(FallbackRunner):
     retries run out instead of pausing the task.
     """
 
-    @contextmanager
-    def main_scope(self) -> Iterator[None]:
+    def main_scope(self) -> AbstractContextManager[None]:
         # Reset before the fallback call starts: nothing is behind the
         # fallback, so if it runs out of retries the task should pause.
-        token = _FALLBACK_AVAILABLE.set(True)
-        try:
-            yield
-        finally:
-            _FALLBACK_AVAILABLE.reset(token)
+        return raise_when_exhausted()
 
     def fallback_reason(self, error: Exception) -> tuple[str, str | None] | None:
         if isinstance(error, LLMCallError):
