@@ -702,13 +702,17 @@ class FlashRunner:
         raw_text: str,
         step_token_usage: dict,
         pre_screenshot_bytes,
-        xml_list,
         post_img_bytes,
         injected: str | None = None,
         native_text: str | None = None,
         action_dict: dict | None = None,
     ):
-        """Records telemetry / step in DataEngine; returns the step id or None."""
+        """Records telemetry / step in DataEngine; returns the step id or None.
+
+        No ``ui_tree`` is passed: ``observe`` already stored the structured tree and
+        screen identity under the pre-action screenshot, and the step resolves both
+        from there.
+        """
         recorded_step_id = None
         try:
             if self.ctx.data_engine.current_step_id is None:
@@ -734,7 +738,6 @@ class FlashRunner:
             recorded_step_id = self.ctx.data_engine.record_step(
                 pre_screenshot_bytes=pre_screenshot_bytes,
                 post_screenshot_bytes=post_img_bytes,
-                ui_tree=(exec_result.ui_elements_text or xml_list),
                 action_taken=action_dict,
                 operator_raw_thinking=raw_text,
                 operator_native_thinking=native_text or None,
@@ -811,7 +814,6 @@ class FlashRunner:
                     raw_text,
                     step_token_usage,
                     pre_screenshot_bytes,
-                    xml_list,
                     post_img_bytes,
                     injected=injected,
                     native_text=native_text,
