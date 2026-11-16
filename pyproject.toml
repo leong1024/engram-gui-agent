@@ -75,6 +75,7 @@ dependencies = [
     "ipykernel>=6.29.0",
     "langchain-anthropic>=1.5.4",
     "sqlite-vec>=0.1.9",
+    "rustworkx>=0.18.1",
 ]
 
 [project.optional-dependencies]

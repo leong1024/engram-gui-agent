@@ -5,7 +5,7 @@ from artemis.app_memory.map_graph import MapGraph
 from artemis.app_memory.milestones import Milestone
 from artemis.app_memory.models import ScreenObservation, StateId
 from artemis.app_memory.routing.constants import MAX_HOPS
-from artemis.app_memory.routing.paths import shortest_path
+from artemis.app_memory.routing.paths import PathFinder
 from artemis.app_memory.routing.types import (
     Arrived,
     AtState,
@@ -40,7 +40,7 @@ class RoutePlanner:
         self._graph = graph
         self._target = target
         self._borrowed = borrowed
-        self._adjacency = weigh(graph)
+        self._paths = PathFinder(weigh(graph))
 
     def locate(self, observation: ScreenObservation) -> Location:
         return locate(observation, self._graph, self._target)
@@ -57,7 +57,7 @@ class RoutePlanner:
         )
         if isinstance(location, Arrived):
             return route
-        path = shortest_path(self._adjacency, location.state_id, self._target, MAX_HOPS)
+        path = self._paths.shortest(location.state_id, self._target, MAX_HOPS)
         if path is None:
             return replace(route, kind=RouteKind.NO_PATH)
         hops = tuple(
