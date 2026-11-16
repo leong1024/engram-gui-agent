@@ -2,7 +2,6 @@ import asyncio
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 
-from artemis.app_memory.map_graph import MapGraph
 from artemis.app_memory.milestones import Milestone
 from artemis.app_memory.retrieval import NoTarget, NoTargetReason, TargetResolution
 from third_party.mobile_use.utils.logger import get_logger
@@ -15,9 +14,10 @@ BUDGET_SECONDS = 20.0
 
 @dataclass(frozen=True, slots=True)
 class KnownTarget:
+    """A target whose map is loaded in the run's MapGraphCache."""
+
     milestone: Milestone
     resolution: TargetResolution
-    graph: MapGraph
 
 
 Found = KnownTarget | NoTarget

@@ -1,15 +1,26 @@
 from collections.abc import Iterator
+from dataclasses import dataclass
 
 import pytest
 
 from artemis.app_memory.milestones import Milestone
-from artemis.app_memory.routing import RouteKind, RoutePlanner, RouteTracker
+from artemis.app_memory.models import ScreenObservation
+from artemis.app_memory.routing import RouteKind, RoutePlanner, RouteTracker, RoutingMap
 from artemis.app_memory.routing.types import HintNote, Route
 from tests.unit.app_memory.fixtures.maps import SETTINGS_MAP, MapBuilder, launch, page, tap
 
 
+@dataclass
+class Tracking:
+    tracker: RouteTracker
+    routing_map: RoutingMap
+
+    def step(self, observation: ScreenObservation) -> Route | None:
+        return self.tracker.step(observation, self.routing_map)
+
+
 @pytest.fixture
-def tracker(tmp_path) -> Iterator[RouteTracker]:
+def tracker(tmp_path) -> Iterator[Tracking]:
     """Launch → Home → Menu → Display, plus Sound → Display off the route."""
     build = MapBuilder.open(tmp_path / "app_memory.db")
     home, menu, display, sound = (build.state(n) for n in ("Home", "Menu", "Display", "Sound"))
@@ -17,10 +28,10 @@ def tracker(tmp_path) -> Iterator[RouteTracker]:
     build.edge(home, menu, tap("Menu"))
     build.edge(menu, display, tap("Display"))
     build.edge(sound, display, tap("Display"))
-    graph = build.store.graph.map_graph(SETTINGS_MAP)
+    routing_map = RoutingMap.build(build.store.graph.map_graph(SETTINGS_MAP))
     build.store.close()
     milestone = Milestone("m1", "Turn on dark theme")
-    yield RouteTracker(RoutePlanner(milestone, graph, display, borrowed=False))
+    yield Tracking(RouteTracker(RoutePlanner(milestone, display, borrowed=False)), routing_map)
 
 
 def path(route: Route | None) -> list[str]:

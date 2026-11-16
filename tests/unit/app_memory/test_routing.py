@@ -1,11 +1,12 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import replace
 
 import pytest
 
+from artemis.app_memory.map_graph import MapGraph
 from artemis.app_memory.milestones import Milestone
-from artemis.app_memory.models import MapId, StateId
-from artemis.app_memory.routing import RouteKind, RoutePlanner
+from artemis.app_memory.models import ScreenObservation, StateId
+from artemis.app_memory.routing import Route, RouteKind, RoutePlanner, RoutingMap
 from tests.unit.app_memory.fixtures.maps import NOW, SETTINGS_MAP, MapBuilder, launch, page, tap
 
 MILESTONE = Milestone("m1", "Turn on dark theme")
@@ -18,13 +19,16 @@ def build(tmp_path) -> Iterator[MapBuilder]:
     builder.store.close()
 
 
-def planner(build: MapBuilder, target: StateId, map_id: MapId = SETTINGS_MAP) -> RoutePlanner:
-    return RoutePlanner(MILESTONE, build.store.graph.map_graph(map_id), target, borrowed=False)
+def router(
+    build: MapBuilder, target: StateId, graph: MapGraph | None = None
+) -> Callable[[ScreenObservation], Route]:
+    routing_map = RoutingMap.build(graph or build.store.graph.map_graph(SETTINGS_MAP))
+    plan = RoutePlanner(MILESTONE, target, borrowed=False)
+    return lambda screen: plan.route(plan.locate(screen, routing_map), routing_map)
 
 
-def route_from(build: MapBuilder, name: str, target: StateId):
-    plan = planner(build, target)
-    return plan.route(plan.locate(page(name)))
+def route_from(build: MapBuilder, name: str, target: StateId) -> Route:
+    return router(build, target)(page(name))
 
 
 def test_one_confirmed_observation_gives_two_thirds(build):
@@ -89,8 +93,7 @@ def test_an_opaque_screen_on_the_way_costs_more(build):
         graph, states={**graph.states, dim: replace(graph.states[dim], is_opaque=True)}
     )
     for map_graph, expected in ((graph, "Dim"), (opaque, "Clear")):
-        plan = RoutePlanner(MILESTONE, map_graph, display, borrowed=False)
-        assert plan.route(plan.locate(page("Home"))).hops[0].to_state.title == expected
+        assert router(build, display, map_graph)(page("Home")).hops[0].to_state.title == expected
 
 
 def test_ties_go_to_the_more_recently_seen_route(build):
@@ -116,15 +119,15 @@ def test_routes_stop_at_fifteen_hops(build, length, kind):
     chain = [build.state(f"Page {chr(97 + i)}") for i in range(length + 1)]
     for src, dst in zip(chain, chain[1:]):
         build.edge(src, dst, tap("Next"))
-    plan = planner(build, chain[-1])
-    assert plan.route(plan.locate(page("Page a"))).kind is kind
+    route = router(build, chain[-1])
+    assert route(page("Page a")).kind is kind
 
 
 def test_localization_covers_each_situation(build):
     home, display = build.state("Home"), build.state("Display")
     build.edge(build.outside(), home, launch())
     build.edge(home, display, tap("Display"))
-    plan = planner(build, display)
+    route = router(build, display)
     cases = {
         "known screen": (page("Home"), RouteKind.FROM_STATE, 1),
         "another app": (page("Inbox", package="com.example.mail"), RouteKind.FROM_OUTSIDE, 2),
@@ -132,17 +135,17 @@ def test_localization_covers_each_situation(build):
         "on the target": (page("Display"), RouteKind.ARRIVED, 0),
     }
     for label, (screen, kind, hops) in cases.items():
-        route = plan.route(plan.locate(screen))
-        assert (route.kind, len(route.hops)) == (kind, hops), label
-    assert plan.route(plan.locate(page("Bluetooth"))).hops[0].actions == (launch(),)
+        found = route(screen)
+        assert (found.kind, len(found.hops)) == (kind, hops), label
+    assert route(page("Bluetooth")).hops[0].actions == (launch(),)
 
 
 def test_a_borrowed_target_localizes_against_the_older_map(build):
     home, display = build.state("Home"), build.state("Display")
     build.edge(home, display, tap("Display"))
-    plan = planner(build, display)
+    route = router(build, display)
     newer_screen = page("Home", version_code=35)
-    assert plan.route(plan.locate(newer_screen)).kind is RouteKind.FROM_STATE
+    assert route(newer_screen).kind is RouteKind.FROM_STATE
 
 
 def test_a_target_with_no_path_still_names_the_target(build):
