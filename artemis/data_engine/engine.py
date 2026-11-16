@@ -1130,6 +1130,21 @@ class DataEngine:
 
     async def shutdown(self):
         """Wait for all pending background tasks and threads to complete."""
+        await self.wait_for_writes()
+
+        with self._ipc_socket_lock:
+            self._ipc_shutdown = True
+            if self.ipc_socket is not None:
+                try:
+                    self.ipc_socket.close()
+                except OSError:
+                    pass
+                self.ipc_socket = None
+
+        logger.info("DataEngine shutdown complete. All data persisted.")
+
+    async def wait_for_writes(self) -> None:
+        """Wait for the background writes started so far; the engine stays usable."""
         if self._pending_tasks:
             logger.info(
                 f"Waiting for {len(self._pending_tasks)} pending async tasks to complete..."
@@ -1142,17 +1157,6 @@ class DataEngine:
             for thread in threads_to_join:
                 if thread.is_alive():
                     await asyncio.to_thread(thread.join)
-
-        with self._ipc_socket_lock:
-            self._ipc_shutdown = True
-            if self.ipc_socket is not None:
-                try:
-                    self.ipc_socket.close()
-                except OSError:
-                    pass
-                self.ipc_socket = None
-
-        logger.info("DataEngine shutdown complete. All data persisted.")
 
     def stream_output(
         self,
