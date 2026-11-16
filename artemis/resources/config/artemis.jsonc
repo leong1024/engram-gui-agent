@@ -126,6 +126,8 @@
     // 🎯 Planner Validation: Advisory review of milestone changes.
     // Defaults to the same lightweight model as the pixel safety net
     // (gemini-3.5-flash-lite, temperature 0); add "planner_validation": {...} here to override.
+    // 🗺️ App memory: "app_memory_describer" names screens and actions (needs vision);
+    // "app_memory_selector" picks a milestone's target screen. Both inherit 'default'.
   },
 
   // ------------------------------------------------------------------------------

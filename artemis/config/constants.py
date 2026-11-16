@@ -148,4 +148,6 @@ AgentNode = Literal[
     "planner_validation",
     "validator",
     "output_analyzer",
+    "app_memory_describer",
+    "app_memory_selector",
 ]

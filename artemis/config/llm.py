@@ -90,6 +90,8 @@ class LLMConfig(LLMConfigBase):
     validator_pixel_safety_net: LLMWithFallback | None = None
     planner_validation: LLMWithFallback | None = None
     output_analyzer: LLMWithFallback | None = None
+    app_memory_describer: LLMWithFallback | None = None
+    app_memory_selector: LLMWithFallback | None = None
 
     def validate_providers(self) -> None:
         """Validate credentials across all configured agent nodes."""
@@ -117,17 +119,71 @@ class LLMConfig(LLMConfigBase):
     def get_agent(self, item: AgentNode) -> LLMWithFallback:
         """Retrieve model configuration for a specific agent node with sensible defaults."""
         val = getattr(self, item)
-        if val is None:
-            if item == "history_analyzer":
-                return self.operator
-            elif item in ("validator_pixel_safety_net", "planner_validation"):
-                # Both are cheap, high-frequency judges: the pixel safety net
-                # runs before actions, the planner validator after every
-                # milestone edit. They share one lightweight default.
-                return lightweight_judge_default()
-            elif item == "output_analyzer":
-                return self.log_analyzer
-        return val
+        if val is not None:
+            return val
+        # Only a config written in the full schema leaves an app memory node unset; it has
+        # no default block, and the summarizer is the node closest to one.
+        base = OPTIONAL_NODE_BASES.get(item, "summarizer")
+        if base == LIGHTWEIGHT_JUDGE:
+            return lightweight_judge_default()
+        return getattr(self, base)
+
+
+DEFAULT_NODE_CONFIG: dict[str, Any] = {
+    "provider": "google",
+    "model": "gemini-3.8-flash",
+    "fallback": {
+        "provider": "google",
+        "model": "gemini-3.7-flash",
+    },
+}
+
+AGENT_NODES = (
+    "planner",
+    "summarizer",
+    "operator",
+    "operator_summarizer",
+    "log_reader_sub_agent",
+    "log_analyzer",
+    "diagnoser",
+    "checker",
+    "planner_avatar",
+    "history_analyzer_expert",
+    "diagnoser_expert",
+    "explorer",
+    "app_memory_describer",
+    "app_memory_selector",
+)
+
+UTILS_NODES = ("outputter", "hopper", "video_analyzer", "object_detector")
+
+LIGHTWEIGHT_JUDGE = "lightweight_judge"
+
+OPTIONAL_NODE_BASES: dict[str, str] = {
+    "history_analyzer": "operator",
+    "validator_pixel_safety_net": LIGHTWEIGHT_JUDGE,
+    "planner_validation": LIGHTWEIGHT_JUDGE,
+    "output_analyzer": "log_analyzer",
+}
+"""Optional nodes and the node they inherit from when not configured. A `nodes` override of
+an optional node is merged onto that base."""
+
+
+def _merge_node(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = {**merged[key], **value}
+        else:
+            merged[key] = value
+    return merged
+
+
+def _optional_base(node: str, expanded: dict[str, Any]) -> dict[str, Any]:
+    base = OPTIONAL_NODE_BASES[node]
+    if base == LIGHTWEIGHT_JUDGE:
+        return lightweight_judge_default().model_dump(exclude_none=True)
+    return expanded[base]
 
 
 def _expand_default_into_nodes(config_dict: dict) -> dict:
@@ -135,65 +191,21 @@ def _expand_default_into_nodes(config_dict: dict) -> dict:
     if "planner" in config_dict and "utils" in config_dict:
         return config_dict
 
-    default_model_cfg = config_dict.get(
-        "default",
-        {
-            "provider": "google",
-            "model": "gemini-3.8-flash",
-            "fallback": {
-                "provider": "google",
-                "model": "gemini-3.7-flash",
-            },
-        },
-    )
-
+    default_model_cfg = config_dict.get("default", DEFAULT_NODE_CONFIG)
     nodes_override = config_dict.get("nodes", {})
+    unknown = set(nodes_override) - {*AGENT_NODES, *UTILS_NODES, *OPTIONAL_NODE_BASES}
+    if unknown:
+        logger.warning(f"Ignoring unknown LLM nodes in config 'nodes': {sorted(unknown)}")
 
-    all_agent_nodes = [
-        "planner",
-        "summarizer",
-        "operator",
-        "operator_summarizer",
-        "log_reader_sub_agent",
-        "log_analyzer",
-        "diagnoser",
-        "checker",
-        "planner_avatar",
-        "history_analyzer_expert",
-        "diagnoser_expert",
-        "explorer",
-    ]
-
-    all_utils_nodes = [
-        "outputter",
-        "hopper",
-        "video_analyzer",
-        "object_detector",
-    ]
-
-    result: dict[str, Any] = {}
-    for node in all_agent_nodes:
-        node_cfg = dict(default_model_cfg)
+    result: dict[str, Any] = {
+        node: _merge_node(default_model_cfg, nodes_override.get(node, {})) for node in AGENT_NODES
+    }
+    for node in OPTIONAL_NODE_BASES:
         if node in nodes_override:
-            for k, v in nodes_override[node].items():
-                if isinstance(v, dict) and isinstance(node_cfg.get(k), dict):
-                    node_cfg[k] = {**node_cfg[k], **v}
-                else:
-                    node_cfg[k] = v
-        result[node] = node_cfg
-
-    utils_dict: dict[str, Any] = {}
-    for util in all_utils_nodes:
-        util_cfg = dict(default_model_cfg)
-        if util in nodes_override:
-            for k, v in nodes_override[util].items():
-                if isinstance(v, dict) and isinstance(util_cfg.get(k), dict):
-                    util_cfg[k] = {**util_cfg[k], **v}
-                else:
-                    util_cfg[k] = v
-        utils_dict[util] = util_cfg
-    result["utils"] = utils_dict
-
+            result[node] = _merge_node(_optional_base(node, result), nodes_override[node])
+    result["utils"] = {
+        node: _merge_node(default_model_cfg, nodes_override.get(node, {})) for node in UTILS_NODES
+    }
     return result
 
 
