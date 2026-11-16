@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
@@ -70,7 +71,7 @@ def _ollama(config: AppMemoryEmbeddingConfig) -> Embeddings:
     return OpenAIEmbeddings(
         model=config.model,
         api_key=SecretStr("ollama"),
-        base_url=config.base_url or OLLAMA_BASE_URL,
+        base_url=config.base_url or os.environ.get("OPENAI_BASE_URL", OLLAMA_BASE_URL),
         dimensions=config.dimensions,
         check_embedding_ctx_length=False,
     )

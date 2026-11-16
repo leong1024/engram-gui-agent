@@ -124,6 +124,7 @@ class Enrichment:
     ) -> None:
         store.documents.put_vectors(model, docs, vectors, self._clock())
         self._model = model
+        self.queue(store)
 
     def _described(self, key: JobKey, summary: str) -> None:
         self._offload(functools.partial(self._save_description, key, summary))
