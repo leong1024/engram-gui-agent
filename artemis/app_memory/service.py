@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Concatenate, ParamSpec, TypeVar
 
 from artemis.app_memory.abstraction.constants import SYSTEM_UI_PACKAGES
+from artemis.app_memory.enrichment import Enrichment, StoreJob, open_enrichment
 from artemis.app_memory.harvester import Harvester
 from artemis.app_memory.interface import AppMemoryService, NoopAppMemory
 from artemis.app_memory.launcher import launcher_package
@@ -54,9 +55,15 @@ class AppMemory:
     owns the store's SQLite connection, so the agent's own loop never waits on it."""
 
     def __init__(
-        self, db_path: Path, reader: TraceReader, excluded: frozenset[str], engine: "DataEngine"
+        self,
+        db_path: Path,
+        reader: TraceReader,
+        excluded: frozenset[str],
+        engine: "DataEngine",
+        enrichment: Enrichment | None = None,
     ) -> None:
         self.disabled = False
+        self._enrichment = enrichment
         self._db_path = db_path
         self._reader = reader
         self._excluded = excluded
@@ -81,6 +88,8 @@ class AppMemory:
             self._executor.submit(self._harvest_live, session_id)
 
     async def prepare_run(self, *, device_serial: str | None) -> None:
+        if self._enrichment is not None:
+            self._enrichment.bind(asyncio.get_running_loop(), self._offload)
         await self._run(self._prepare, device_serial)
 
     async def finalize_session(self, session_id: str, outcome: str) -> None:
@@ -101,34 +110,51 @@ class AppMemory:
         await self._engine.wait_for_writes()
         for session_id, outcome in self._ended.items():
             await self.finalize_session(session_id, outcome)
+        if self._enrichment is not None:
+            await self._enrichment.close()
         await self._run(self._close_store)
 
     async def _run(self, job: Callable[..., None], *args: Any) -> None:
         if not self._closed:
             await asyncio.wrap_future(self._executor.submit(job, *args))
 
-    def _harvester_for_run(self) -> Harvester:
-        if self._harvester is None:
+    def _open(self) -> tuple[MapStore, Harvester]:
+        if self._store is None or self._harvester is None:
             self._store = MapStore.open(self._db_path)
             self._harvester = Harvester(self._store, self._reader, self._excluded)
-        return self._harvester
+        return self._store, self._harvester
+
+    def _harvested(self) -> None:
+        if self._enrichment is not None and self._store is not None:
+            self._enrichment.queue(self._store)
+
+    def _offload(self, job: StoreJob) -> None:
+        if not self._closed:
+            self._executor.submit(self._store_job, job)
+
+    @guarded
+    def _store_job(self, job: StoreJob) -> None:
+        job(self._open()[0])
 
     @guarded
     def _prepare(self, device_serial: str | None) -> None:
         launcher = launcher_package(device_serial) if device_serial else None
         if launcher:
             self._excluded |= {launcher}
-        self._harvester_for_run().reconcile()
+        self._open()[1].reconcile()
+        self._harvested()
 
     @guarded
     def _harvest_live(self, session_id: str) -> None:
-        self._harvester_for_run().harvest_live(session_id)
+        self._open()[1].harvest_live(session_id)
+        self._harvested()
 
     @guarded
     def _finalize(self, session_id: str, status: str) -> None:
         session = self._reader.session(session_id)
         outcome = parse_outcome(status, session.run_task_status if session else None)
-        self._harvester_for_run().finalize(session_id, outcome)
+        self._open()[1].finalize(session_id, outcome)
+        self._harvested()
 
     @guarded
     def _close_store(self) -> None:
@@ -150,6 +176,8 @@ def open_app_memory(engine: "DataEngine | None") -> AppMemoryService:
     if engine is None or not (config.enabled and config.harvest.enabled):
         return NoopAppMemory()
     reader = TraceReader(engine.storage, engine.global_base_dir)
-    memory = AppMemory(engine.global_base_dir / DB_FILE, reader, excluded_packages(config), engine)
+    enrichment = open_enrichment(engine.ctx, config, engine.get_image_path)
+    db_path = engine.global_base_dir / DB_FILE
+    memory = AppMemory(db_path, reader, excluded_packages(config), engine, enrichment)
     engine.subscribe(memory.on_event)
     return memory
