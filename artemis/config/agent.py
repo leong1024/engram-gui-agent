@@ -756,6 +756,30 @@ class MemoryConfig(BaseModel):
     model_config = {"extra": "allow"}
 
 
+class AppMemoryHarvestConfig(BaseModel):
+    """Harvesting recorded steps into app maps (agent.app_memory.harvest)."""
+
+    enabled: bool = Field(default=True, description="Whether recorded steps are harvested.")
+    exclude_packages: list[str] = Field(
+        default_factory=list,
+        description="Packages never harvested, in addition to the launcher and system UI.",
+    )
+    model_config = {"extra": "allow"}
+
+
+class AppMemoryConfig(BaseModel):
+    """Per-app maps learned from earlier runs (agent.app_memory)."""
+
+    enabled: bool = Field(
+        default=True, description="Master switch: false disables harvesting and hints."
+    )
+    harvest: AppMemoryHarvestConfig = Field(
+        default_factory=AppMemoryHarvestConfig,
+        description="Harvesting options.",
+    )
+    model_config = {"extra": "allow"}
+
+
 class FlashProfileConfig(BaseModel):
     """Configuration options specific to the ⚡ Flash execution profile (FlashRunner/ReactiveRunner)."""
 
@@ -907,6 +931,10 @@ class AgentGlobalConfig(BaseModel):
     memory: MemoryConfig = Field(
         default_factory=MemoryConfig,
         description="Unified step-memory runtime and transcript scrub options.",
+    )
+    app_memory: AppMemoryConfig = Field(
+        default_factory=AppMemoryConfig,
+        description="App memory: per-app maps harvested from earlier runs.",
     )
 
     model_config = {"extra": "allow"}

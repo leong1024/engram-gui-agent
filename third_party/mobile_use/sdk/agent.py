@@ -517,6 +517,7 @@ class AgentBase:
                 # publish a new active session while the current task is still
                 # finishing.
                 self._prepare_tracing(task=task, context=context)
+                await self._prepare_app_memory(context=context)
                 self._prepare_output_files(task=task)
                 if os.environ.get("ARTEMIS_CLOUD_MODE") != "1":
                     if self._ui_adb_client is not None:

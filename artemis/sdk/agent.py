@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 from google import genai
 from langchain_google_genai import ChatGoogleGenerativeAI
 
+from artemis.app_memory.service import open_app_memory
 from artemis.clients.screen_client_factory import (
     describe_backend,
     helper_version,
@@ -338,6 +339,11 @@ class Agent(AgentBase):
             device_info=device_data,
             session_id=sess_uuid,
         )
+        context.app_memory = open_app_memory(context.data_engine)
+
+    async def _prepare_app_memory(self, context: ArtemisContext) -> None:
+        """Reconcile earlier sessions inside the device lock, before the agent loop starts."""
+        await context.app_memory.prepare_run(device_serial=self._device_context.device_id)
 
     async def _finalize_tracing_safely(self, task: Task, context: ArtemisContext):
         """Finalize optional trace artifacts without changing task semantics."""
