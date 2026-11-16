@@ -6,6 +6,7 @@ depends_on:
   - retrieval.md
   - data-model.md
   - decisions/0008-advisory-hints.md
+  - decisions/0011-shared-map-graph.md
 code:
   - artemis/app_memory/routing/constants.py
   - artemis/app_memory/routing/types.py
@@ -13,6 +14,8 @@ code:
   - artemis/app_memory/routing/paths.py
   - artemis/app_memory/routing/planner.py
   - artemis/app_memory/routing/tracker.py
+  - artemis/app_memory/routing/routing_map.py
+  - artemis/app_memory/map_graph_cache.py
   - artemis/app_memory/hints.py
   - artemis/app_memory/map_graph.py
   - artemis/app_memory/graph_store.py
@@ -123,10 +126,10 @@ A `RouteTracker` per active milestone runs once per Operator turn, before the pr
   `constants.py`, as in the abstraction package. `weights.py` computes `p̂` and the cost,
   `paths.py` holds Dijkstra, `planner.py` holds `locate` and `RoutePlanner`, and `tracker.py`
   holds `RouteTracker`.
-- **The map is a snapshot.** When a target is found, `GraphStore.map_graph` loads its map once:
-  states with their descriptions, edges, and observation counts grouped by source, action,
-  edge and status. `route_for` then reads only memory and never waits on the database. States
-  harvested later in the same run are not localized until the next run.
+- **The map is loaded once per run.** When a target is found, `GraphStore.map_graph` loads its
+  map: states with their descriptions, edges, and observation counts grouped by source, action,
+  edge and status. `route_for` then reads only memory and never waits on the database. This
+  note's first version made the map a snapshot; see the shared map notes below.
 - **Localization** returns one of `AtState`, `InOtherApp`, `Unrecognised` or `Arrived`. Each
   carries the state the route starts from, which is the map's `@outside` for the middle two,
   and the route kind it gives.
@@ -148,6 +151,22 @@ A `RouteTracker` per active milestone runs once per Operator turn, before the pr
   prefers labels over resource id segments. Harvesting records typed text under the slot
   `text`, so typed input reads `Type the text into "Search"`. "Seen N times" uses the arrival
   count described in [retrieval](retrieval.md).
+
+## Implementation notes (shared map)
+
+See [0011](decisions/0011-shared-map-graph.md) for the measurements behind this design.
+
+- **One map per run.** `MapGraphCache` (`map_graph_cache.py`) holds one `RoutingMap` per
+  `MapId`: the `MapGraph` and its weighted `PathFinder` (`routing/routing_map.py`). Every
+  milestone whose target is in that map routes over it.
+- **Planner and tracker.** `RoutePlanner` holds only the milestone, the target and `borrowed`.
+  `RouteTracker.step(observation, routing_map)` takes the current map on each turn, so a route
+  found on an older map keeps advancing, and a reroute uses the newer map.
+- **Kept current.** After each live harvest pass and each finalize, the store worker re-reads
+  the rows that the session touched in each loaded map whose session mark moved, merges them
+  with `MapGraph.merged`, rebuilds weights and the `PathFinder`, and swaps the map in. A screen
+  harvested earlier in the run is localized and routed. Writes from other processes are not
+  picked up until the next run.
 
 ## Contracts
 
