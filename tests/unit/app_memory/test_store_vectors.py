@@ -17,15 +17,15 @@ def store(tmp_path):
 
 def test_vector_tables_are_created_per_model_and_searchable(store):
     model = EmbeddingModel("gemini/text-embedding-004", "gemini", "text-embedding-004", 4)
-    table = store.ensure_vector_table(model)
-    assert store.ensure_vector_table(model) == table
+    table = store.documents.ensure_vector_table(model)
+    assert store.documents.ensure_vector_table(model) == table
     assert table in store.table_names()
 
 
 def test_vector_table_accepts_and_ranks_embeddings(tmp_path):
     path = tmp_path / "app_memory.db"
     opened = MapStore.open(path)
-    table = opened.ensure_vector_table(EmbeddingModel("m", "p", "m", 2))
+    table = opened.documents.ensure_vector_table(EmbeddingModel("m", "p", "m", 2))
     opened.close()
 
     raw = sqlite3.connect(path)

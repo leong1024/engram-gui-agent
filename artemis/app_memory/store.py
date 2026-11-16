@@ -1,18 +1,18 @@
 import json
 import sqlite3
-from collections.abc import Iterable, Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import Iterable, Sequence
+from contextlib import AbstractContextManager
 from pathlib import Path
 
 import sqlite_vec
 
 from artemis.app_memory import ids, queries, schema
+from artemis.app_memory.document_store import DocumentStore
 from artemis.app_memory.models import (
     AbstractScreen,
     CanonicalAction,
     EdgeCounts,
     EdgeId,
-    EmbeddingModel,
     KnownState,
     MapId,
     MapStats,
@@ -22,6 +22,7 @@ from artemis.app_memory.models import (
     StateId,
     StateSample,
 )
+from artemis.app_memory.transaction import transaction
 from artemis.app_memory.rows import (
     map_key,
     observation_params,
@@ -40,6 +41,7 @@ class VectorExtensionError(RuntimeError):
 class MapStore:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
+        self.documents = DocumentStore(conn)
 
     @classmethod
     def open(cls, path: Path) -> "MapStore":
@@ -57,15 +59,8 @@ class MapStore:
     def close(self) -> None:
         self._conn.close()
 
-    @contextmanager
-    def _transaction(self) -> Iterator[sqlite3.Connection]:
-        self._conn.execute("BEGIN IMMEDIATE")
-        try:
-            yield self._conn
-        except BaseException:
-            self._conn.execute("ROLLBACK")
-            raise
-        self._conn.execute("COMMIT")
+    def _transaction(self) -> AbstractContextManager[sqlite3.Connection]:
+        return transaction(self._conn)
 
     def _create_schema(self) -> None:
         with self._transaction() as conn:
@@ -155,14 +150,6 @@ class MapStore:
     def edge_counts(self, edge_id: EdgeId) -> EdgeCounts:
         row = self._conn.execute(queries.SELECT_COUNTS, (edge_id,)).fetchone()
         return EdgeCounts(*row)
-
-    def ensure_vector_table(self, model: EmbeddingModel) -> str:
-        with self._transaction() as conn:
-            conn.execute(
-                queries.INSERT_MODEL, (model.model_id, model.provider, model.model, model.dim)
-            )
-            conn.execute(schema.vector_table_ddl(model))
-        return schema.vector_table_name(model.model_id)
 
     def table_names(self) -> set[str]:
         rows = self._conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
