@@ -3,6 +3,7 @@ from dataclasses import replace
 from artemis.app_memory.models import ScreenObservation
 from artemis.app_memory.routing.constants import HIDE_AFTER_UNKNOWN_TURNS
 from artemis.app_memory.routing.planner import RoutePlanner
+from artemis.app_memory.routing.routing_map import RoutingMap
 from artemis.app_memory.routing.types import Arrived, HintNote, Location, Route, Unrecognised
 
 
@@ -16,18 +17,20 @@ class RouteTracker:
         self._route: Route | None = None
         self._unknown_turns = 0
 
-    def step(self, observation: ScreenObservation) -> Route | None:
-        location = self._planner.locate(observation)
+    def step(self, observation: ScreenObservation, routing_map: RoutingMap) -> Route | None:
+        """`routing_map` may be newer than the one the current route was found on. State ids
+        are stable across maps, so the route still advances, and a reroute uses the newer map."""
+        location = self._planner.locate(observation, routing_map)
         route = self._route
         if isinstance(location, Unrecognised) and route is not None:
             return self._unknown(route)
         self._unknown_turns = 0
         if isinstance(location, Arrived):
-            return self._planner.route(location)
+            return self._planner.route(location, routing_map)
         if route is not None and (ahead := _advance(route, location)) is not None:
             self._route = ahead
             return ahead
-        self._route = self._planner.route(location)
+        self._route = self._planner.route(location, routing_map)
         return self._route if route is None else replace(self._route, notes=(HintNote.REROUTED,))
 
     def _unknown(self, route: Route) -> Route | None:

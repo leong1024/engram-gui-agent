@@ -149,6 +149,8 @@ job fills the new one. Retrieval only reads the current model's table.
 - `GraphStore` (`graph_store.py`) holds the read-only map queries for retrieval and routing,
   reached as `MapStore.graph` on the same connection. Its SQL is in `graph_queries.py`.
 - `edges` gains the index `idx_edges_dst` on `dst_state_id`, used to count arrivals per state.
+- `observations` gains the index `idx_observations_src` on `src_state_id`, used to re-read the
+  rows a session touched in a map (see [0011](decisions/0011-shared-map-graph.md)).
 - New `vec_` tables declare `distance_metric=cosine`. Tables from P4 keep L2 ranking, and the
   search computes cosine similarity explicitly for both.
 

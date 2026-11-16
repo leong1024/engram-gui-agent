@@ -54,6 +54,7 @@ and waits for the operator's go.
 | [0008](decisions/0008-advisory-hints.md) | Routes are advisory, with a screen signature per hop. |
 | [0009](decisions/0009-no-measurement-phase-1.md) | No measurement harness in phase 1; an on/off switch only. |
 | [0010](decisions/0010-rustworkx-for-routing.md) | Dijkstra through rustworkx, graph built once per planner. |
+| [0011](decisions/0011-shared-map-graph.md) | One shared routing map per app map per run, refreshed from harvest writes. |
 
 ## Depends on
 

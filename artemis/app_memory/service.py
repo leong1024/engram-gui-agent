@@ -10,6 +10,7 @@ from artemis.app_memory.guard import guarded
 from artemis.app_memory.harvester import Harvester
 from artemis.app_memory.interface import AppMemoryService, NoopAppMemory
 from artemis.app_memory.launcher import installed_versions, launcher_package
+from artemis.app_memory.map_graph_cache import MapGraphCache
 from artemis.app_memory.milestones import Milestone
 from artemis.app_memory.models import ScreenObservation
 from artemis.app_memory.navigator import Navigator, NavigatorFactory, open_navigator
@@ -48,6 +49,7 @@ class AppMemory:
         self._enrichment = enrichment
         self._open_navigator = navigator
         self._navigator: Navigator | None = None
+        self._maps = MapGraphCache()
         self._installed: dict[str, int] = {}
         self._db_path = db_path
         self._reader = reader
@@ -77,7 +79,7 @@ class AppMemory:
             self._enrichment.bind(asyncio.get_running_loop(), self._offload)
         await self._run(self._prepare, device_serial)
         if self._open_navigator is not None:
-            self._navigator = self._open_navigator(self._read, self._installed)
+            self._navigator = self._open_navigator(self._read, self._maps, self._installed)
 
     @guarded
     def request_targets(self, goal: str, milestones: Sequence[Milestone]) -> None:
@@ -125,8 +127,12 @@ class AppMemory:
             self._harvester = Harvester(self._store, self._reader, self._excluded)
         return self._store, self._harvester
 
-    def _harvested(self) -> None:
-        if self._enrichment is not None and self._store is not None:
+    def _harvested(self, session_id: str | None = None) -> None:
+        if self._store is None:
+            return
+        if session_id is not None:
+            self._maps.refresh(self._store, session_id)
+        if self._enrichment is not None:
             self._enrichment.queue(self._store)
 
     def _offload(self, job: StoreJob) -> None:
@@ -149,14 +155,14 @@ class AppMemory:
     @guarded
     def _harvest_live(self, session_id: str) -> None:
         self._open()[1].harvest_live(session_id)
-        self._harvested()
+        self._harvested(session_id)
 
     @guarded
     def _finalize(self, session_id: str, status: str) -> None:
         session = self._reader.session(session_id)
         outcome = parse_outcome(status, session.run_task_status if session else None)
         self._open()[1].finalize(session_id, outcome)
-        self._harvested()
+        self._harvested(session_id)
 
     @guarded
     def _close_store(self) -> None:

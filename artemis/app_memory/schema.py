@@ -90,6 +90,7 @@ TABLES: tuple[str, ...] = (
     "CREATE INDEX IF NOT EXISTS idx_edges_src ON edges (src_state_id)",
     "CREATE INDEX IF NOT EXISTS idx_edges_dst ON edges (dst_state_id)",
     "CREATE INDEX IF NOT EXISTS idx_observations_edge ON observations (edge_id)",
+    "CREATE INDEX IF NOT EXISTS idx_observations_src ON observations (src_state_id)",
 )
 
 REBUILD_COUNTS = """

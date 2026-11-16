@@ -95,9 +95,9 @@ async def test_the_service_routes_a_milestone_once_its_target_is_found(tmp_path,
     await embed_all(build.store, hash_provider())
     build.store.close()
 
-    def navigator(read, installed):
+    def navigator(read, maps, installed):
         retriever = Retriever(read, hash_provider(), FakeSelector(by_title("Display")))
-        return Navigator(retriever, read, installed)
+        return Navigator(retriever, read, maps, installed)
 
     monkeypatch.setattr(service, "open_navigator", lambda *args: navigator)
     monkeypatch.setattr(service, "launcher_package", lambda serial: None)
