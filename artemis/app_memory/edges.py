@@ -10,11 +10,10 @@ from artemis.app_memory.models import (
     MapId,
     ObservationRecord,
     ObservationStatus,
-    Sighting,
     StateId,
-    Transition,
 )
 from artemis.app_memory.store import MapStore
+from artemis.app_memory.transitions import Sighting, Transition
 
 ENTRY_SUFFIX = "@entry"
 

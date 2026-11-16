@@ -6,12 +6,11 @@ from typing import Any
 from artemis.app_memory.actions import step_actions
 from artemis.app_memory.models import (
     UNKNOWN_VERSION_CODE,
-    HarvestStep,
     ScreenObservation,
-    Sighting,
     StateSample,
 )
 from artemis.app_memory.outcomes import TraceSession
+from artemis.app_memory.transitions import HarvestStep, Sighting
 from artemis.data_engine.models import StepRecord
 from artemis.data_engine.storage import StorageManager
 from artemis.runtime.process_probe import pid_is_alive

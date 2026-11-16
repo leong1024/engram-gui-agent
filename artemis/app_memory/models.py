@@ -170,28 +170,6 @@ class StateSample:
 
 
 @dataclass(frozen=True, slots=True)
-class Sighting:
-    screen: ScreenObservation
-    sample: StateSample
-
-
-@dataclass(frozen=True, slots=True)
-class HarvestStep:
-    step_id: str
-    recorded_at: float
-    actions: tuple[CanonicalAction, ...]
-    is_wait: bool
-    sighting: Sighting | None
-
-
-@dataclass(frozen=True, slots=True)
-class Transition:
-    step: HarvestStep
-    source: Sighting
-    destination: Sighting
-
-
-@dataclass(frozen=True, slots=True)
 class MapStats:
     map_id: MapId
     states: int

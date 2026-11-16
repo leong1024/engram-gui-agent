@@ -2,7 +2,8 @@ import time
 from collections.abc import Callable, Iterable
 
 from artemis.app_memory.edges import MapWriter
-from artemis.app_memory.models import ObservationStatus, SessionOutcome, Transition
+from artemis.app_memory.models import ObservationStatus, SessionOutcome
+from artemis.app_memory.transitions import Transition
 from artemis.app_memory.outcomes import OBSERVATION_STATUS, settled_outcome
 from artemis.app_memory.store import MapStore
 from artemis.app_memory.trace_reader import TraceReader
