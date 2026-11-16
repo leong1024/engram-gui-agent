@@ -12,6 +12,9 @@ code:
   - artemis/app_memory/transaction.py
   - artemis/app_memory/document_store.py
   - artemis/app_memory/document_queries.py
+  - artemis/app_memory/graph_store.py
+  - artemis/app_memory/graph_queries.py
+  - artemis/app_memory/map_graph.py
 ---
 
 # Data model
@@ -140,6 +143,14 @@ job fills the new one. Retrieval only reads the current model's table.
 - `map_stats` counts states and edges per `app_versions` row, and observations by the map of
   their source state, so no-effect observations count too.
 - Row mapping lives in `rows.py`. `store.py` keeps every statement that touches the database.
+
+## Implementation notes (P5)
+
+- `GraphStore` (`graph_store.py`) holds the read-only map queries for retrieval and routing,
+  reached as `MapStore.graph` on the same connection. Its SQL is in `graph_queries.py`.
+- `edges` gains the index `idx_edges_dst` on `dst_state_id`, used to count arrivals per state.
+- New `vec_` tables declare `distance_metric=cosine`. Tables from P4 keep L2 ranking, and the
+  search computes cosine similarity explicitly for both.
 
 ## Contracts
 

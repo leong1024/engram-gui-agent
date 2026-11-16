@@ -1,14 +1,22 @@
 ---
 feature: app-memory
-status: draft
+status: implemented
 depends_on:
   - state-abstraction.md
   - retrieval.md
   - data-model.md
   - decisions/0008-advisory-hints.md
 code:
-  - artemis/app_memory/routing.py
+  - artemis/app_memory/routing/constants.py
+  - artemis/app_memory/routing/types.py
+  - artemis/app_memory/routing/weights.py
+  - artemis/app_memory/routing/paths.py
+  - artemis/app_memory/routing/planner.py
+  - artemis/app_memory/routing/tracker.py
   - artemis/app_memory/hints.py
+  - artemis/app_memory/map_graph.py
+  - artemis/app_memory/graph_store.py
+  - artemis/app_memory/graph_queries.py
 ---
 
 # Routing and hints
@@ -108,6 +116,38 @@ A `RouteTracker` per active milestone runs once per Operator turn, before the pr
    reappears.
 5. **On the target:** render "Arrived". Once the milestone is marked done in the plan, the
    tracker is discarded.
+
+## Implementation notes (P5)
+
+- **Modules.** `routing.py` became the package `routing/`. The constants are in
+  `constants.py`, as in the abstraction package. `weights.py` computes `p̂` and the cost,
+  `paths.py` holds Dijkstra, `planner.py` holds `locate` and `RoutePlanner`, and `tracker.py`
+  holds `RouteTracker`.
+- **The map is a snapshot.** When a target is found, `GraphStore.map_graph` loads its map once:
+  states with their descriptions, edges, and observation counts grouped by source, action,
+  edge and status. `route_for` then reads only memory and never waits on the database. States
+  harvested later in the same run are not localized until the next run.
+- **Localization** returns one of `AtState`, `InOtherApp`, `Unrecognised` or `Arrived`. Each
+  carries the state the route starts from, which is the map's `@outside` for the middle two,
+  and the route kind it gives.
+- **Route.** `Route.kind` is one enum, `from_state`, `from_outside`, `from_launch`, `no_path` or
+  `arrived`, in place of `source_kind`. A route also carries the milestone, the map, and the
+  state cards the hint needs. `confidence` is computed from the hops.
+- **Hop cap.** Dijkstra settles each state once, so a cheapest path longer than 15 hops is
+  dropped instead of searching for a costlier path within 15 hops. Ties go to fewer hops, then
+  to the path whose oldest edge was seen most recently.
+- **Tracker.** The hint hides on the second consecutive unknown turn. "Rerouted" shows only on
+  the turn of the reroute. On the first turn, an unknown screen gives the route from launch
+  without the "not recognised" note. A screen that is still the route's source keeps the route
+  as it is.
+- **Hint text.** "Arrived" renders the header, the milestone and the single arrival line. "No
+  path" renders the header, the milestone and the target screen line. A route from another app
+  leads with "From outside the app:". Borrowed, rerouted and not-recognised lines follow the
+  "Seen" line. Actions render from a table keyed by action kind, and a burst joins its actions
+  with ", then ". The per-hop signature skips tokens that contain a masking placeholder and
+  prefers labels over resource id segments. Harvesting records typed text under the slot
+  `text`, so typed input reads `Type the text into "Search"`. "Seen N times" uses the arrival
+  count described in [retrieval](retrieval.md).
 
 ## Contracts
 
