@@ -271,6 +271,12 @@
       "harvest": {
         "enabled": true,
         "exclude_packages": [] // In addition to the launcher and com.android.systemui
+      },
+      "embedding": {
+        "provider": "gemini", // gemini | openai | ollama
+        "model": "gemini-embedding-2",
+        "dimensions": null // null keeps the model's own size; changing it re-embeds into a new table
+        // "base_url": "http://localhost:11434/v1" // OpenAI-compatible endpoint for openai and ollama
       }
     },
     // 🎬 Screen Recording & Video Analyzer Configuration

@@ -767,6 +767,23 @@ class AppMemoryHarvestConfig(BaseModel):
     model_config = {"extra": "allow"}
 
 
+EmbeddingProviderName = Literal["gemini", "openai", "ollama"]
+
+
+class AppMemoryEmbeddingConfig(BaseModel):
+    """Embedding model for state and edge documents (agent.app_memory.embedding)."""
+
+    provider: EmbeddingProviderName = Field(default="gemini", description="Embedding provider.")
+    model: str = Field(default="gemini-embedding-2", description="Embedding model name.")
+    dimensions: int | None = Field(
+        default=None, gt=0, description="Output dimensions; null keeps the model's own."
+    )
+    base_url: str | None = Field(
+        default=None, description="OpenAI-compatible endpoint for openai and ollama."
+    )
+    model_config = {"extra": "allow"}
+
+
 class AppMemoryConfig(BaseModel):
     """Per-app maps learned from earlier runs (agent.app_memory)."""
 
@@ -776,6 +793,10 @@ class AppMemoryConfig(BaseModel):
     harvest: AppMemoryHarvestConfig = Field(
         default_factory=AppMemoryHarvestConfig,
         description="Harvesting options.",
+    )
+    embedding: AppMemoryEmbeddingConfig = Field(
+        default_factory=AppMemoryEmbeddingConfig,
+        description="Embedding model for retrieval.",
     )
     model_config = {"extra": "allow"}
 

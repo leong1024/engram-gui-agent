@@ -94,7 +94,13 @@ class DocumentStore:
                 conn.execute(
                     f"INSERT INTO {table} (rowid, map_key, owner_kind, owner_id, embedding) "
                     "VALUES (?, ?, ?, ?, ?)",
-                    (rowid, doc.map_key, kind, owner_id, sqlite_vec.serialize_float32(vector)),
+                    (
+                        rowid,
+                        doc.map_key,
+                        kind,
+                        owner_id,
+                        sqlite_vec.serialize_float32(list(vector)),
+                    ),
                 )
 
     def _state_documents(self, model_id: str | None) -> list[tuple[EmbeddingDoc, str | None]]:
