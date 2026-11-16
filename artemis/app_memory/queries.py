@@ -7,8 +7,9 @@ ON CONFLICT (package, version_code) DO UPDATE SET
 
 UPSERT_STATE = """
 INSERT INTO states (state_id, package, version_code, activity, coarse_key, skeleton,
-                    static_tokens, is_opaque, dhash, first_seen_at, last_seen_at)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    static_tokens, is_opaque, dhash, sample_session_id, sample_step_id,
+                    sample_image_sha, first_seen_at, last_seen_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT (state_id) DO UPDATE SET last_seen_at = MAX(last_seen_at, excluded.last_seen_at)
 """
 
@@ -51,4 +52,50 @@ SELECT_COUNTS = "SELECT confirmed_n, discounted_n, provisional_n FROM edges WHER
 INSERT_MODEL = """
 INSERT INTO embedding_models (model_id, provider, model, dim) VALUES (?, ?, ?, ?)
 ON CONFLICT (model_id) DO NOTHING
+"""
+
+SELECT_OBSERVED_STEPS = "SELECT step_id FROM observations WHERE session_id = ?"
+
+INSERT_LIVE_SESSION = """
+INSERT INTO harvested_sessions (session_id, status) VALUES (?, 'live')
+ON CONFLICT (session_id) DO NOTHING
+"""
+
+SETTLE_OBSERVATIONS = """
+UPDATE observations SET status = ? WHERE session_id = ? AND status = 'provisional'
+"""
+
+SELECT_SESSION_EDGES = """
+SELECT DISTINCT edge_id FROM observations WHERE session_id = ? AND edge_id IS NOT NULL
+"""
+
+FINALIZE_SESSION = """
+INSERT INTO harvested_sessions (session_id, status, outcome, finalized_at)
+VALUES (?, 'finalized', ?, ?)
+ON CONFLICT (session_id) DO UPDATE SET
+    status = 'finalized',
+    outcome = COALESCE(outcome, excluded.outcome),
+    finalized_at = COALESCE(finalized_at, excluded.finalized_at)
+"""
+
+SELECT_LIVE_SESSIONS = """
+SELECT session_id FROM harvested_sessions WHERE status = 'live' ORDER BY session_id
+"""
+
+SELECT_LAST_ACTIVITY = "SELECT MAX(recorded_at) FROM observations WHERE session_id = ?"
+
+SELECT_MAP_STATS = """
+SELECT v.package, v.version_code,
+       (SELECT COUNT(*) FROM states x WHERE x.package = v.package
+            AND x.version_code = v.version_code AND x.is_virtual = 0),
+       (SELECT COUNT(*) FROM edges e WHERE e.package = v.package
+            AND e.version_code = v.version_code),
+       COALESCE(SUM(o.status = 'confirmed'), 0),
+       COALESCE(SUM(o.status = 'discounted'), 0),
+       COALESCE(SUM(o.status = 'provisional'), 0)
+FROM app_versions v
+LEFT JOIN states s ON s.package = v.package AND s.version_code = v.version_code
+LEFT JOIN observations o ON o.src_state_id = s.state_id
+GROUP BY v.package, v.version_code
+ORDER BY v.package, v.version_code
 """

@@ -24,6 +24,14 @@ class ObservationStatus(StrEnum):
     DROPPED = "dropped"
 
 
+class SessionOutcome(StrEnum):
+    COMPLETED = "completed"
+    PARTIAL = "partial"
+    BLOCKED = "blocked"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class DescriptionStatus(StrEnum):
     PENDING = "pending"
     READY = "ready"
@@ -88,6 +96,11 @@ class TargetDescriptor:
             bucketed = tuple(_bucket(v) for v in self.rel_bounds)
             object.__setattr__(self, "rel_bounds", bucketed)
 
+    @property
+    def identity(self) -> str | None:
+        described = " ".join((self.target_description or "").lower().split())
+        return self.resource_id or self.text or self.content_desc or described or None
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "resource_id": self.resource_id,
@@ -118,6 +131,10 @@ class CanonicalAction:
             "input_slot": self.input_slot,
         }
 
+    def signature_key(self) -> list[Any]:
+        identity = self.target.identity if self.target else None
+        return [self.kind.value, identity, dict(self.params), self.input_slot]
+
 
 @dataclass(frozen=True, slots=True)
 class ObservationRecord:
@@ -143,3 +160,42 @@ class EmbeddingModel:
     provider: str
     model: str
     dim: int
+
+
+@dataclass(frozen=True, slots=True)
+class StateSample:
+    session_id: str
+    step_id: str
+    image_sha: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class Sighting:
+    screen: ScreenObservation
+    sample: StateSample
+
+
+@dataclass(frozen=True, slots=True)
+class HarvestStep:
+    step_id: str
+    recorded_at: float
+    actions: tuple[CanonicalAction, ...]
+    is_wait: bool
+    sighting: Sighting | None
+
+
+@dataclass(frozen=True, slots=True)
+class Transition:
+    step: HarvestStep
+    source: Sighting
+    destination: Sighting
+
+
+@dataclass(frozen=True, slots=True)
+class MapStats:
+    map_id: MapId
+    states: int
+    edges: int
+    confirmed: int
+    discounted: int
+    provisional: int

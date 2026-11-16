@@ -20,7 +20,9 @@ def outside_state_id(map_id: MapId) -> StateId:
 
 
 def action_signature(actions: Sequence[CanonicalAction]) -> ActionSignature:
-    canonical = json.dumps([a.as_dict() for a in actions], sort_keys=True, separators=(",", ":"))
+    canonical = json.dumps(
+        [a.signature_key() for a in actions], sort_keys=True, separators=(",", ":")
+    )
     return ActionSignature(_sha1(canonical))
 
 
