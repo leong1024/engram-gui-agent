@@ -11,6 +11,7 @@ code:
   - artemis/app_memory/harvester.py
   - artemis/app_memory/describer.py
   - artemis/data_engine/engine.py
+  - artemis/context.py
   - artemis/sdk/agent.py
 ---
 
@@ -86,9 +87,14 @@ shift between devices and screen sizes; it is kept only as a descriptor field.
 
 ## Phase 1: live
 
-A **step listener** on the DataEngine calls `AppMemory.on_step_recorded(step, observation)`
-after each `record_step`. The listener hook is new: `DataEngine.add_step_listener(callback)`. It
-runs on the DataEngine's background scheduler, never on the agent's hot path.
+App memory subscribes to the DataEngine with the existing `DataEngine.subscribe(callback)`, which
+already delivers a `step_recorded` event after each `record_step`. No new listener hook is added.
+The callback hands the step to `AppMemory.on_step_recorded(step, observation)` off the agent's
+hot path.
+
+Live harvesting is best-effort. The event can arrive before the step row is written by the
+DataEngine's background writer, so a step the live path misses is picked up by the post-run
+pass, which sweeps the whole session idempotently.
 
 On each call the harvester:
 
@@ -102,9 +108,12 @@ The first call in a session inserts a `harvested_sessions` row with `status = li
 
 ## Phase 2: post-run
 
-`AppMemory.finalize_session(session_id, outcome)` is called once the task status is known, from
-`Agent._finalize_tracing_safely` ([sdk/agent.py:342](../../../artemis/sdk/agent.py#L342)). The
-outcome is the DataEngine session status, refined by Pro's `run_outcome.json` when it exists. In
+`AppMemory.finalize_session(session_id, outcome)` is called from the DataEngine
+`session_ended` event, which carries the session status. It is not called from
+`Agent._finalize_tracing_safely` ([sdk/agent.py](../../../artemis/sdk/agent.py)): that runs after
+`async with context` has exited, when the DataEngine is already shut down. Before the DataEngine
+shuts down, `ArtemisContext.__aexit__` ([context.py](../../../artemis/context.py)) flushes app
+memory. The outcome is the session status, refined by Pro's `run_outcome.json` when it exists. In
 one transaction it sets every provisional observation of the session:
 
 | Outcome | Observations become | Weight in routing |
@@ -152,9 +161,12 @@ in-process SDK runs often have no Daemon, so reconciling in `prepare_run` covers
 
 `artemis app-memory backfill [--session ID | --all]` runs live and post-run harvesting over
 sessions already in `data_engine.db`, using their recorded outcome. It is idempotent: an
-existing `(session_id, step_id)` observation is skipped. Old Pro sessions harvest without
-activity or version, and land in the `version_code = -1` bucket. Old Flash sessions lack a
-structured pre-action tree and are skipped.
+existing `(session_id, step_id)` observation is skipped. Old sessions of both profiles harvest
+without activity or version, and land in the `version_code = -1` bucket. Old Flash sessions are
+not skipped: their step rows recorded the post-action text, but the `images` row of each
+`pre_image_name` holds the structured pre-action tree, because `observe` stored it first and
+`get_or_create_image` keeps the first tree (see
+[step-recording-fields](../shared/step-recording-fields.md)). Backfill reads the tree from there.
 
 `artemis app-memory stats` prints states, edges and observation counts per map.
 
