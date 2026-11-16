@@ -1,6 +1,6 @@
 ---
 feature: app-memory
-status: implemented
+status: draft
 depends_on:
   - state-abstraction.md
   - retrieval.md
