@@ -9,7 +9,9 @@ depends_on:
   - decisions/0007-in-process-graph-injected.md
 code:
   - artemis/app_memory/__init__.py
+  - artemis/app_memory/interface.py
   - artemis/app_memory/service.py
+  - artemis/app_memory/launcher.py
   - artemis/context.py
   - artemis/sdk/agent.py
   - artemis/data_engine/engine.py
@@ -20,6 +22,8 @@ code:
   - artemis/config/llm.py
   - config/artemis.jsonc
   - artemis/interfaces/cli/main.py
+  - artemis/interfaces/cli/commands/app_memory.py
+  - third_party/mobile_use/sdk/agent.py
 ---
 
 # Integration (Pro)
@@ -194,6 +198,26 @@ handling in [services/llm.py](../../../artemis/services/llm.py).
 - **Any exception inside app memory:** logged with the session id, and the run continues
   without hints.
 - **Database locked or corrupt:** app memory disables itself for the run with one warning.
+
+## Implementation notes (P3)
+
+- **Interface.** `artemis/app_memory/interface.py` holds the `AppMemoryService` protocol and
+  `NoopAppMemory`, with no heavy imports, so `ArtemisContext` can default `app_memory` to the
+  no-op without an import cycle. `open_app_memory(data_engine)` lives in `service.py`.
+- **`on_step_recorded(session_id)`** takes the session id, not a step and an observation. The
+  event carries no tree, and Pro's execution status arrives after the event, so the harvester
+  reads the steps back from the DataEngine. `on_event` is the DataEngine subscriber.
+- **`request_targets` and `route_for`** are not added yet. P5 adds them.
+- **Lifecycle.** `_prepare_tracing` opens the service after `start_session`. `_run_task` in the
+  shared base calls `Agent._prepare_app_memory` in one line, inside the device lock, and that
+  calls `prepare_run`. `ArtemisContext.__aexit__` awaits `app_memory.close()` before the
+  DataEngine shuts down. `close` waits at most 10 s.
+- **Threading.** All map work runs on one worker thread per run, which owns the SQLite
+  connection. The store opens lazily, so a run with harvesting off creates no `app_memory.db`.
+- **Isolation.** One `guarded` decorator catches, logs with the call arguments and continues. A
+  `sqlite3.DatabaseError` disables app memory for the rest of the run.
+- **Config.** Only `enabled` and `harvest` exist in P3. The packaged copy in
+  `artemis/resources/config/artemis.jsonc` carries the same block.
 
 ## Testing
 

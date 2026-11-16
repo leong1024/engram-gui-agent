@@ -9,8 +9,15 @@ depends_on:
   - decisions/0004-live-plus-post-run-harvest.md
 code:
   - artemis/app_memory/harvester.py
+  - artemis/app_memory/transitions.py
+  - artemis/app_memory/actions.py
+  - artemis/app_memory/edges.py
+  - artemis/app_memory/outcomes.py
+  - artemis/app_memory/trace_reader.py
   - artemis/app_memory/describer.py
   - artemis/data_engine/engine.py
+  - artemis/data_engine/storage.py
+  - artemis/interfaces/cli/commands/app_memory.py
   - artemis/context.py
   - artemis/sdk/agent.py
 ---
@@ -169,6 +176,32 @@ not skipped: their step rows recorded the post-action text, but the `images` row
 [step-recording-fields](../shared/step-recording-fields.md)). Backfill reads the tree from there.
 
 `artemis app-memory stats` prints states, edges and observation counts per map.
+
+## Implementation notes (P3)
+
+- **Modules.** `transitions.scan` is a pure reducer from ordered steps to closed transitions.
+  `actions.step_actions` canonicalizes both profiles' `action_taken`. `edges.MapWriter` matches
+  or creates states and splits cross-app transitions. `outcomes.py` holds the outcome table and
+  the staleness rule. `trace_reader.TraceReader` is the only reader of `data_engine.db`.
+- **A step executed** only when its `last_execution_result.status` is `dispatched`. Pro writes
+  that status after the step is recorded, so the live path re-reads the session tail from the
+  DataEngine on each `step_recorded` event and keeps the newest step open for the next pass.
+- **Finalize runs at close.** The `session_ended` event records the session status. The
+  post-run pass runs in `AppMemory.close()`, after `DataEngine.wait_for_writes()`, so the last
+  step rows are on disk before the sweep. A session that ends after close, on the cancel and
+  error paths, stays `live` and the next `prepare_run` reconciles it.
+- **Reconcile** finalizes a `live` session whose DataEngine row is terminal, whose recorded pid
+  is dead, or that started more than 6 hours ago. A live session with no DataEngine row is
+  finalized as `failed` when its newest observation is more than 6 hours old.
+- **Entry edges** need their own observation, but `observations` allows one per step. The
+  entry edge's observation uses the step id with an `@entry` suffix.
+- **Action signature.** P2 hashed the whole target descriptor, `rel_bounds` included. P3 hashes
+  the target identity defined above, as this note specifies.
+- **`open_link` params** keep only the URL host. **`manage_app` params** keep the mode and the
+  package.
+- **Deterministic writes.** States, edges and observations take the step timestamp, not the
+  wall clock, and `finalized_at` keeps its first value. That is what makes a second backfill
+  leave the database byte-identical.
 
 ## Contracts
 
