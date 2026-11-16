@@ -240,13 +240,17 @@ async def test_perception_node_async_offloading(mock_artemis_ctx, tmp_path):
     # Verify injected_instruction.json was unlinked
     assert not instruction_file.exists()
 
-    # Await background tasks triggered by perception_node
-    await asyncio.sleep(0.1)
+    # The image write is an untracked to_thread task, so wait for it rather than a fixed delay.
     if engine._pending_tasks:
         await asyncio.gather(*engine._pending_tasks)
+    img_record = None
+    for _ in range(100):
+        img_record = engine.storage.get_image(expected_hash)
+        if img_record is not None:
+            break
+        await asyncio.sleep(0.05)
 
     # Verify image record and file were created in background by perception_node
-    img_record = engine.storage.get_image(expected_hash)
     assert img_record is not None
     assert img_record.image_name == expected_hash
     assert engine.get_image_path(expected_hash).exists()
