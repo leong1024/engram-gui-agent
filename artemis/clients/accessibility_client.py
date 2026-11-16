@@ -346,6 +346,7 @@ class AccessibilityClient:
     def get_screen_data(self) -> UIAutomatorScreenData:
         snapshot = self._snapshot()
         xml, elements = self._elements_from_dump(snapshot)
+        activity = _activity(snapshot)
         if snapshot.get("has_screenshot") and snapshot.get("screenshot_base64"):
             width, height = _dimensions(snapshot)
             return UIAutomatorScreenData(
@@ -354,6 +355,8 @@ class AccessibilityClient:
                 elements=elements,
                 width=width,
                 height=height,
+                activity=activity,
+                ui_backend="helper",
             )
 
         # Android 10 and below (or a rate-limited capture that did not recover):
@@ -370,6 +373,8 @@ class AccessibilityClient:
             elements=elements,
             width=screenshot.width,
             height=screenshot.height,
+            activity=activity,
+            ui_backend="helper",
         )
 
     # ------------------------------------------------------------------ #
@@ -422,6 +427,12 @@ def _read_error_body(exc: urllib.error.HTTPError) -> str:
         return exc.read().decode("utf-8", "replace")
     except OSError:
         return str(exc)
+
+
+def _activity(snapshot: dict[str, Any]) -> str | None:
+    """The helper's last window-state class; it is "" until the first window change."""
+    activity = snapshot.get("activity")
+    return activity if isinstance(activity, str) and activity else None
 
 
 def _dimensions(snapshot: dict[str, Any]) -> tuple[int, int]:

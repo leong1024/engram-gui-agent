@@ -37,6 +37,7 @@ import uiautomator2 as u2
 
 from artemis.runtime.adb_endpoint import adb_command
 from artemis.runtime.awake_service import ensure_device_awake
+from artemis.utils.app_launch_utils import parse_foreground_task
 from artemis.utils.cython_compat import CyFunctionDetector
 from third_party.mobile_use.utils.logger import get_logger
 
@@ -47,6 +48,8 @@ logger = get_logger(__name__)
 
 
 MAESTRO_PACKAGE = "dev.mobile.maestro"
+_RESUMED_ACTIVITY_CMD = "dumpsys activity activities | grep ResumedActivity"
+_ACTIVITY_TIMEOUT_S = 1.0
 
 # Boolean attributes of a UIAutomator hierarchy node.
 UIAUTOMATOR_BOOL_ATTRIBUTES = (
@@ -73,6 +76,21 @@ class UIAutomatorScreenData(BaseModel):
     elements: list[dict]
     width: int
     height: int
+    activity: str | None = None
+    ui_backend: str | None = None
+
+
+def resumed_activity_class(dump: str) -> str | None:
+    """Fully qualified class of the resumed activity in ``dumpsys activity activities``.
+
+    ``com.android.settings/.Settings`` becomes ``com.android.settings.Settings``, the
+    form the accessibility helper reports, so both backends record the same name.
+    """
+    task = parse_foreground_task(dump)
+    if task is None or not task.resumed_component:
+        return None
+    package, _, activity = task.resumed_component.partition("/")
+    return f"{package}{activity}" if activity.startswith(".") else activity
 
 
 def parse_hierarchy_xml_to_elements(hierarchy_xml: str) -> list[dict]:
@@ -434,7 +452,17 @@ class UIAutomatorClient:
             elements=elements,
             width=screenshot.width,
             height=screenshot.height,
+            activity=self._resumed_activity(device),
+            ui_backend="uiautomator",
         )
+
+    def _resumed_activity(self, device: "Device") -> str | None:
+        try:
+            dump = device.shell(_RESUMED_ACTIVITY_CMD, timeout=_ACTIVITY_TIMEOUT_S).output
+        except (OSError, RuntimeError, u2.exceptions.DeviceError) as exc:
+            logger.debug(f"Reading the resumed activity on {self._device_id} failed: {exc}")
+            return None
+        return resumed_activity_class(dump)
 
     def disconnect(self, stop_server: bool = False) -> None:
         """Disconnect this client without ending the host's awake lifetime.

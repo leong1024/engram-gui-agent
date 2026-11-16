@@ -16,6 +16,7 @@
 
 import asyncio
 import base64
+from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Literal
@@ -67,6 +68,22 @@ def _escape_for_adb_text(s: str) -> str:
         .replace("~", "\\~")
         .replace(" ", "%s")
     )
+
+
+def _text_or_none(value: Any) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+@dataclass
+class _ClientScreen:
+    """What the screen client returned; fields stay empty where it gave nothing usable."""
+
+    screenshot_base64: str = ""
+    screenshot_bytes: bytes = b""
+    hierarchy_xml: str | None = None
+    elements: list[dict[str, Any]] = field(default_factory=list)
+    activity: str | None = None
+    ui_backend: str | None = None
 
 
 class AndroidAdbDriver(BaseDeviceDriver):
@@ -124,38 +141,11 @@ class AndroidAdbDriver(BaseDeviceDriver):
             await asyncio.sleep(0.3)
 
         # 1. Capture raw screenshot
-        screenshot_bytes: bytes = b""
-        screenshot_base64: str = ""
-        ui_hierarchy_xml: str | None = None
-        ui_elements: list[dict[str, Any]] = []
-
-        # Check if ui_adb_client has direct screen data support
-        if self._ui_adb_client and hasattr(self._ui_adb_client, "get_screen_data"):
-            try:
-                raw_ui_data = self._ui_adb_client.get_screen_data()
-                if (
-                    hasattr(raw_ui_data, "base64")
-                    and isinstance(raw_ui_data.base64, str)
-                    and raw_ui_data.base64
-                ):
-                    screenshot_base64 = raw_ui_data.base64
-                    screenshot_bytes = base64.b64decode(screenshot_base64)
-                if hasattr(raw_ui_data, "width") and isinstance(raw_ui_data.width, int):
-                    self._width = raw_ui_data.width
-                if hasattr(raw_ui_data, "height") and isinstance(raw_ui_data.height, int):
-                    self._height = raw_ui_data.height
-                if hasattr(raw_ui_data, "hierarchy_xml") and isinstance(
-                    raw_ui_data.hierarchy_xml, str
-                ):
-                    ui_hierarchy_xml = raw_ui_data.hierarchy_xml
-                if hasattr(raw_ui_data, "elements"):
-                    raw_elements = raw_ui_data.elements
-                    if isinstance(raw_elements, dict):
-                        ui_elements = [raw_elements]
-                    elif isinstance(raw_elements, list):
-                        ui_elements = raw_elements
-            except Exception as e:
-                logger.debug(f"Direct ui_adb_client.get_screen_data error: {e}")
+        client_screen = self._read_client_screen()
+        screenshot_bytes = client_screen.screenshot_bytes
+        screenshot_base64 = client_screen.screenshot_base64
+        ui_hierarchy_xml = client_screen.hierarchy_xml
+        ui_elements = client_screen.elements
 
         if not screenshot_base64 or not isinstance(screenshot_base64, str):
             try:
@@ -224,7 +214,41 @@ class AndroidAdbDriver(BaseDeviceDriver):
             width=w,
             height=h,
             platform="android",
+            activity=client_screen.activity,
+            ui_backend=client_screen.ui_backend,
         )
+
+    def _read_client_screen(self) -> _ClientScreen:
+        """One ``get_screen_data`` call on the screen client, when it offers one."""
+        screen = _ClientScreen()
+        if not (self._ui_adb_client and hasattr(self._ui_adb_client, "get_screen_data")):
+            return screen
+        try:
+            raw_ui_data = self._ui_adb_client.get_screen_data()
+            if (
+                hasattr(raw_ui_data, "base64")
+                and isinstance(raw_ui_data.base64, str)
+                and raw_ui_data.base64
+            ):
+                screen.screenshot_base64 = raw_ui_data.base64
+                screen.screenshot_bytes = base64.b64decode(screen.screenshot_base64)
+            if hasattr(raw_ui_data, "width") and isinstance(raw_ui_data.width, int):
+                self._width = raw_ui_data.width
+            if hasattr(raw_ui_data, "height") and isinstance(raw_ui_data.height, int):
+                self._height = raw_ui_data.height
+            if hasattr(raw_ui_data, "hierarchy_xml") and isinstance(raw_ui_data.hierarchy_xml, str):
+                screen.hierarchy_xml = raw_ui_data.hierarchy_xml
+            if hasattr(raw_ui_data, "elements"):
+                raw_elements = raw_ui_data.elements
+                if isinstance(raw_elements, dict):
+                    screen.elements = [raw_elements]
+                elif isinstance(raw_elements, list):
+                    screen.elements = raw_elements
+            screen.activity = _text_or_none(getattr(raw_ui_data, "activity", None))
+            screen.ui_backend = _text_or_none(getattr(raw_ui_data, "ui_backend", None))
+        except Exception as e:
+            logger.debug(f"Direct ui_adb_client.get_screen_data error: {e}")
+        return screen
 
     async def tap(
         self,

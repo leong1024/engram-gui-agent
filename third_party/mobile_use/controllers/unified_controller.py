@@ -169,6 +169,8 @@ class UnifiedMobileControllerBase:
             width=data.width,
             height=data.height,
             platform=data.platform,
+            activity=data.activity,
+            ui_backend=data.ui_backend,
         )
 
     async def find_element(
