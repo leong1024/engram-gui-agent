@@ -8,6 +8,7 @@ import sqlite_vec
 
 from artemis.app_memory import ids, queries, schema
 from artemis.app_memory.document_store import DocumentStore
+from artemis.app_memory.graph_store import GraphStore
 from artemis.app_memory.models import (
     AbstractScreen,
     CanonicalAction,
@@ -24,9 +25,9 @@ from artemis.app_memory.models import (
 )
 from artemis.app_memory.transaction import transaction
 from artemis.app_memory.rows import (
+    known_from_rows,
     map_key,
     observation_params,
-    screen_from_row,
     state_params,
     stats_from_row,
 )
@@ -42,6 +43,7 @@ class MapStore:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self._conn = conn
         self.documents = DocumentStore(conn)
+        self.graph = GraphStore(conn)
 
     @classmethod
     def open(cls, path: Path) -> "MapStore":
@@ -88,8 +90,7 @@ class MapStore:
         return state_id
 
     def known_states(self, map_id: MapId) -> list[KnownState]:
-        rows = self._conn.execute(queries.SELECT_STATES, map_key(map_id)).fetchall()
-        return [KnownState(StateId(row[0]), screen_from_row(row[1:])) for row in rows]
+        return list(known_from_rows(self._conn.execute(queries.SELECT_STATES, map_key(map_id))))
 
     def put_edge(
         self,
