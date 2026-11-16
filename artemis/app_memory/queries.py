@@ -20,11 +20,16 @@ VALUES (?, ?, ?, '@outside', '[]', '[]', 1, ?, ?)
 ON CONFLICT (state_id) DO NOTHING
 """
 
-SELECT_STATES = """
+
+def select_known(where: str) -> str:
+    return f"""
 SELECT state_id, activity, coarse_key, skeleton, static_tokens, is_opaque, dhash
-FROM states WHERE package = ? AND version_code = ? AND is_virtual = 0
+FROM states s WHERE ({where}) AND is_virtual = 0
 ORDER BY state_id
 """
+
+
+SELECT_STATES = select_known("package = ? AND version_code = ?")
 
 UPSERT_EDGE = """
 INSERT INTO edges (edge_id, package, version_code, src_state_id, dst_state_id,
