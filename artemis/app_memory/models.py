@@ -117,3 +117,29 @@ class CanonicalAction:
             "params": dict(self.params),
             "input_slot": self.input_slot,
         }
+
+
+@dataclass(frozen=True, slots=True)
+class ObservationRecord:
+    session_id: str
+    step_id: str
+    src_state_id: StateId
+    action_signature: ActionSignature
+    status: ObservationStatus
+    recorded_at: float
+    edge_id: EdgeId | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class EdgeCounts:
+    confirmed: int
+    discounted: int
+    provisional: int
+
+
+@dataclass(frozen=True, slots=True)
+class EmbeddingModel:
+    model_id: str
+    provider: str
+    model: str
+    dim: int
