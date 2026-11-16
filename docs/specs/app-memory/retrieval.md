@@ -9,6 +9,8 @@ depends_on:
   - decisions/0006-embedded-vector-index.md
 code:
   - artemis/app_memory/embeddings.py
+  - artemis/app_memory/documents.py
+  - artemis/app_memory/document_store.py
   - artemis/app_memory/retrieval.py
   - artemis/utils/plan_grammar.py
   - artemis/services/llm.py
@@ -131,6 +133,52 @@ It may also be a `NoTarget` carrying the reason.
 - **Selector call fails** after the LLM layer's own retries and fallback: that map gives no
   proposal.
 - **Empty maps or no maps:** `NoTarget` with no LLM call.
+
+## Implementation notes (P4)
+
+P4 builds the describer and the embeddings. The query, the tiers and `retrieval.py` come in P5.
+
+- **Modules.** `describer.py` holds the prompts, the output schemas, `DescriptionLens` and
+  `DescriberService`, a `StepMemoryService` with a concurrency of 2. `enrichment.py` holds
+  `Enrichment`, which queues jobs and moves every write to the app memory worker thread.
+  Description and vector statements live in `DocumentStore` (`document_store.py`), reached as
+  `MapStore.documents` on the same connection, so `store.py` is still the only module that
+  opens `app_memory.db`. Document texts are built in `documents.py`.
+- **Default model.** `gemini-embedding-2`, the newest Gemini embedding model in the installed
+  `langchain-google-genai` profiles (released 2026-04-22). The LangChain client already sends
+  `RETRIEVAL_DOCUMENT` for documents and `RETRIEVAL_QUERY` for queries, so the wrapper sets no
+  task type.
+- **`model_id`.** With `dimensions: null` the size is known only from the first vector, so
+  `EmbeddingProvider.model_for(dim)` builds the `provider/model@dim` id, and the stored
+  `embedding_models` row is looked up by provider and model. `embed_documents` and
+  `embed_query` are async, over the LangChain `aembed_*` calls.
+- **Vector rows.** Each `vec_` row takes the rowid of its `embeddings` row, and `map_key` is
+  `package:version_code`. A changed `text_hash` replaces the vector in place, in the same
+  transaction as the `embeddings` row.
+- **Edges wait for their endpoints.** An edge is described once its source and destination are
+  `ready` or `failed`, or are `@outside`, so its prompt carries both titles. `@outside` reads as
+  "outside the app".
+- **Queueing.** `prepare_run`, every live harvest pass, finalize, and every saved description
+  or vector batch queue up to 50 pending rows and 50 stale documents. Jobs already submitted in
+  the run are skipped.
+- **Failures.** A describer job that runs out of retries becomes `failed`. An embedding batch
+  that fails logs one warning per run and is retried by the next run. With no describer
+  credentials, nothing is queued and one warning is logged. With no embedding key, descriptions
+  still run and one warning is logged.
+- **No task pause.** Describer calls run inside `raise_when_exhausted` from
+  [services/llm.py](../../../artemis/services/llm.py), so exhausted retries fail the attempt
+  instead of pausing the agent's run.
+- **LLM nodes.** `app_memory_describer` and `app_memory_selector` are expanded from `default`
+  with their `nodes` overrides. A config written in the full schema, with no `default` block,
+  falls back to the `summarizer` node. A `nodes` override of an optional node is now merged
+  onto the node it inherits from: `planner_validation` and `validator_pixel_safety_net` onto
+  the lightweight judge, `history_analyzer` onto `operator`, `output_analyzer` onto
+  `log_analyzer`. Unknown node names are logged. The selector's temperature 0 is left to its
+  P5 caller, through `get_llm(..., temperature=0.0)`.
+- **Backfill.** `artemis app-memory backfill` harvests but does not describe or embed. Pending
+  rows are described by the next run's `prepare_run`.
+- **Unit isolation.** `tests/unit/conftest.py` replaces `open_enrichment` with a no-op, so no
+  unit test reaches a model. The describer tests pass fakes.
 
 ## Testing
 
