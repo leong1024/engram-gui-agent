@@ -1,18 +1,16 @@
 import os
-import subprocess
-import sys
-from pathlib import Path
 
 import pytest
 
 from artemis.app_memory.abstraction.constants import SYSTEM_UI_PACKAGES
 from artemis.app_memory.harvester import Harvester
-from artemis.app_memory.models import SessionOutcome
-from artemis.app_memory.outcomes import STALE_AFTER_SECONDS
 from artemis.app_memory.store import MapStore
 from artemis.app_memory.trace_reader import TraceReader
+
+from artemis.app_memory.models import SessionOutcome
 from tests.unit.app_memory.fixtures import screens
 from tests.unit.app_memory.fixtures.parts import CLOCK, SETTINGS
+from tests.unit.app_memory.fixtures.sessions import NOW, five_step_session, nav
 from tests.unit.app_memory.fixtures.traces import (
     MapView,
     Trace,
@@ -21,47 +19,6 @@ from tests.unit.app_memory.fixtures.traces import (
     tap,
     wait,
 )
-
-NOW = 10_000.0
-
-
-def nav(tab: str) -> str:
-    return f"clock:id/nav_{tab.lower()}"
-
-
-@pytest.fixture
-def trace(tmp_path: Path) -> Trace:
-    return Trace(tmp_path)
-
-
-@pytest.fixture
-def harvest(trace: Trace):
-    stores: list[MapStore] = []
-
-    def open_harvester(clock: float = NOW) -> Harvester:
-        store = MapStore.open(trace.root / "app_memory.db")
-        stores.append(store)
-        reader = TraceReader(trace.storage, trace.root)
-        return Harvester(store, reader, SYSTEM_UI_PACKAGES, clock=lambda: clock)
-
-    yield open_harvester
-    for store in stores:
-        store.close()
-
-
-@pytest.fixture
-def view(trace: Trace) -> MapView:
-    return MapView(trace.root / "app_memory.db")
-
-
-def five_step_session(trace: Trace, session_id: str = "s1", status: str = "running"):
-    run = trace.session(session_id, status, pid=os.getpid())
-    run.step(screens.clock("Alarm"), tap(nav("Timer")))
-    run.step(screens.clock("Timer"), flash_click(nav("Stopwatch")))
-    run.step(screens.clock("Stopwatch"), tap(nav("Clock")))
-    run.step(screens.clock("Clock"), tap(nav("Alarm")))
-    run.step(screens.clock("Alarm"))
-    return run
 
 
 def test_a_scripted_session_becomes_provisional_states_and_edges(trace, harvest, view):
@@ -169,92 +126,3 @@ def test_steps_in_an_excluded_package_open_nothing(trace, harvest, view):
     harvest().harvest_live("s1")
 
     assert view.observations("s1") == []
-
-
-@pytest.mark.parametrize(
-    ("status", "task_status", "expected", "counts"),
-    [
-        ("completed", None, ("completed", "confirmed"), (1, 0, 0)),
-        ("success", None, ("completed", "confirmed"), (1, 0, 0)),
-        ("completed", "partial", ("partial", "discounted"), (0, 1, 0)),
-        ("failed", None, ("failed", "discounted"), (0, 1, 0)),
-        ("cancelled", None, ("cancelled", "discounted"), (0, 1, 0)),
-    ],
-)
-def test_the_outcome_confirms_or_discounts_the_whole_session(
-    trace, harvest, view, status, task_status, expected, counts
-):
-    run = trace.session("s1", status, task_status=task_status)
-    run.step(screens.clock("Alarm"), tap(nav("Timer")))
-    run.step(screens.clock("Timer"))
-    harvester = harvest()
-    harvester.harvest_live("s1")
-    harvester.backfill("s1")
-
-    outcome, observation_status = expected
-    assert view.session("s1") == ("finalized", outcome)
-    assert view.observations("s1") == [("s1-1", True, observation_status)]
-    assert view.edges() == [(CLOCK, False, False, 1, *counts)]
-
-
-def test_finalizing_sweeps_steps_the_live_path_missed(trace, harvest, view):
-    run = five_step_session(trace)
-    harvester = harvest()
-    harvester.harvest_live("s1")
-    run.step(screens.clock("Alarm"), tap(nav("Timer")))
-    run.step(screens.clock("Timer"))
-    harvester.finalize("s1", SessionOutcome.COMPLETED)
-
-    expected = [(f"s1-{n}", True, "confirmed") for n in (1, 2, 3, 4, 6)]
-    assert view.observations("s1") == expected
-
-
-def dead_pid() -> int:
-    child = subprocess.run(
-        [sys.executable, "-c", "import os; print(os.getpid())"],
-        text=True,
-        capture_output=True,
-        check=True,
-    )
-    return int(child.stdout)
-
-
-@pytest.mark.parametrize(
-    ("status", "pid", "started_at", "expected"),
-    [
-        ("completed", os.getpid(), NOW, ("finalized", "completed")),
-        ("running", "dead", NOW, ("finalized", "failed")),
-        ("running", os.getpid(), NOW - STALE_AFTER_SECONDS - 1, ("finalized", "failed")),
-        ("running", os.getpid(), NOW, ("live", None)),
-    ],
-)
-def test_reconcile_finalizes_sessions_that_ended_without_a_post_run(
-    trace, harvest, view, status, pid, started_at, expected
-):
-    run = trace.session(
-        "s1", status, pid=dead_pid() if pid == "dead" else pid, started_at=started_at
-    )
-    run.step(screens.clock("Alarm"), tap(nav("Timer")))
-    run.step(screens.clock("Timer"))
-    harvest().harvest_live("s1")
-
-    harvest().reconcile()
-
-    assert view.session("s1") == expected
-
-
-def test_backfilling_twice_leaves_the_database_identical(trace, harvest, view):
-    five_step_session(trace, "s1", status="completed")
-    crossing = trace.session("s2", "failed")
-    crossing.step(screens.settings(), launch(CLOCK), package=SETTINGS)
-    crossing.step(screens.clock("Alarm"), tap(nav("Alarm")))
-    crossing.step(screens.clock("Alarm"))
-
-    for session_id in ("s1", "s2"):
-        harvest(clock=NOW).backfill(session_id)
-    first = view.dump()
-    for session_id in ("s1", "s2"):
-        harvest(clock=NOW + 60).backfill(session_id)
-
-    assert view.dump() == first
-    assert view.session("s2") == ("finalized", "failed")
