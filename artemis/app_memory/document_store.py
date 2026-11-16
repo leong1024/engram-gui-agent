@@ -11,6 +11,7 @@ from artemis.app_memory.documents import (
     OwnerKind,
     PendingEdge,
     PendingState,
+    VectorHit,
     edge_document,
     endpoint_title,
     loads_list,
@@ -70,6 +71,17 @@ class DocumentStore:
     def embedding_model(self, provider: str, model: str, dim: int | None) -> EmbeddingModel | None:
         row = self._conn.execute(queries.SELECT_MODEL, (provider, model, dim, dim)).fetchone()
         return EmbeddingModel(*row) if row else None
+
+    def nearest(
+        self, model: EmbeddingModel, map_id: MapId, vector: Sequence[float], k: int
+    ) -> list[VectorHit]:
+        """The `k` nearest documents of one map, best first, with their cosine similarity."""
+        sql = queries.nearest(schema.vector_table_name(model.model_id))
+        params = (sqlite_vec.serialize_float32(list(vector)), k, vector_map_key(map_id))
+        return [
+            VectorHit(Owner(OwnerKind(kind), owner_id), 1.0 - distance)
+            for kind, owner_id, distance in self._conn.execute(sql, params)
+        ]
 
     def ensure_vector_table(self, model: EmbeddingModel) -> str:
         with transaction(self._conn) as conn:

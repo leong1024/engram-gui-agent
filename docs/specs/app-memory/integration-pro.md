@@ -11,6 +11,10 @@ code:
   - artemis/app_memory/__init__.py
   - artemis/app_memory/interface.py
   - artemis/app_memory/service.py
+  - artemis/app_memory/guard.py
+  - artemis/app_memory/navigator.py
+  - artemis/app_memory/targets.py
+  - artemis/app_memory/milestones.py
   - artemis/app_memory/launcher.py
   - artemis/context.py
   - artemis/sdk/agent.py
@@ -220,6 +224,20 @@ handling in [services/llm.py](../../../artemis/services/llm.py).
   `sqlite3.DatabaseError` disables app memory for the rest of the run.
 - **Config.** Only `enabled` and `harvest` exist in P3. The packaged copy in
   `artemis/resources/config/artemis.jsonc` carries the same block.
+
+## Implementation notes (P5)
+
+- **Interface.** `AppMemoryService` and `NoopAppMemory` gain
+  `request_targets(goal, milestones: Sequence[Milestone])` and
+  `route_for(milestone_key, observation) -> Route | None`. Both are `guarded`.
+- **Navigator.** `open_app_memory` passes a navigator factory to `AppMemory`, and `prepare_run`
+  builds the `Navigator` once the installed versions are known, on the run's event loop.
+  `request_targets` may be called from any thread. `route_for` runs on the event loop and
+  reads only the per-run cache. `close` cancels retrievals still running before it drains.
+- **Guard.** `guarded` moved to `guard.py`, so `service.py` stays under 200 lines.
+- **Unit isolation.** `tests/unit/conftest.py` also replaces `open_navigator` with a no-op.
+- **Not wired yet.** Nothing calls `request_targets` or `route_for` in P5. The graph node and the
+  prompt component come in P6.
 
 ## Testing
 

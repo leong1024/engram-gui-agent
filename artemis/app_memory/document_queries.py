@@ -79,3 +79,12 @@ ON CONFLICT (owner_kind, owner_id, model_id) DO UPDATE SET
     created_at = excluded.created_at
 RETURNING rowid
 """
+
+
+def nearest(table: str) -> str:
+    # Cosine is computed explicitly: tables from before P5 rank by L2.
+    return f"""
+SELECT owner_kind, owner_id, vec_distance_cosine(embedding, ?1) AS cosine
+FROM {table} WHERE embedding MATCH ?1 AND k = ?2 AND map_key = ?3
+ORDER BY cosine, owner_id
+"""

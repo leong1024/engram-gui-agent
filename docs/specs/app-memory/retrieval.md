@@ -11,7 +11,14 @@ code:
   - artemis/app_memory/embeddings.py
   - artemis/app_memory/documents.py
   - artemis/app_memory/document_store.py
-  - artemis/app_memory/retrieval.py
+  - artemis/app_memory/retrieval/types.py
+  - artemis/app_memory/retrieval/candidates.py
+  - artemis/app_memory/retrieval/selector.py
+  - artemis/app_memory/retrieval/retriever.py
+  - artemis/app_memory/milestones.py
+  - artemis/app_memory/targets.py
+  - artemis/app_memory/navigator.py
+  - artemis/app_memory/launcher.py
   - artemis/utils/plan_grammar.py
   - artemis/services/llm.py
 ---
@@ -179,6 +186,43 @@ P4 builds the describer and the embeddings. The query, the tiers and `retrieval.
   rows are described by the next run's `prepare_run`.
 - **Unit isolation.** `tests/unit/conftest.py` replaces `open_enrichment` with a no-op, so no
   unit test reaches a model. The describer tests pass fakes.
+
+## Implementation notes (P5)
+
+- **Modules.** `retrieval.py` became the package `retrieval/`, to keep each module under 200
+  lines. `types.py` holds `TargetResolution`, `NoTarget` and the tier types. `candidates.py`
+  chooses the candidate maps and runs one map's vector search. `selector.py` holds the
+  `app_memory_selector` prompt and `LLMSelector`. `retriever.py` holds `Retriever`, which runs
+  the two tiers. The per-run cache is `TargetQueue` in `targets.py`, and `Navigator` in
+  `navigator.py` joins retrieval to routing for the service.
+- **Milestones.** `Milestone` in `milestones.py` holds the key, the text and the child texts.
+  `plan_milestones(plan)` builds them from a `PlanSnapshot` for P6. The query text is the
+  milestone text and the child texts, one per line.
+- **Installed versions.** `prepare_run` runs `pm list packages --show-versioncode` once, through
+  `installed_versions` in `launcher.py`. Without a device serial no package counts as
+  installed, so every milestone gets `NoTarget(no_maps)`.
+- **Vector search.** One k-nearest-neighbour query per map on the `map_key` partition. The
+  similarity is `1 - vec_distance_cosine`, computed in the query, because tables created in P4
+  rank by L2. Tables created from P5 on declare `distance_metric=cosine`, so the top 20 are
+  also the cosine top 20. An edge hit whose destination is `@outside` nominates nothing.
+- **Selector input.** Tier 1 and tier 2 share one prompt, so tier 1 candidates also show their
+  app and version. `visits` is the number of confirmed and provisional observations that
+  arrived at the state by an edge, because the `visit_count` column is still not maintained.
+  The selector runs through `get_llm(ctx, "app_memory_selector", temperature=0.0)` inside
+  `raise_when_exhausted`, and any failure is "no proposal" for that map.
+- **Tier 2** applies the same `confidence >= 0.5` rule to its answer as tier 1.
+- **Concurrency.** At most 3 milestones run at once, and each runs at most 3 maps at once, so
+  up to 9 selector calls can be in flight. The 20 s budget starts when a milestone gets its
+  slot. A `NoTarget` is cached like a target and is not retried in the same run.
+- **Settings.** `top_k`, `similarity_floor`, `min_confidence`, `fallback_versions` and the map
+  concurrency are fields of `RetrievalSettings` with the spec's values. The `retrieval` config
+  block is not added yet.
+- **Failures.** With no embedding key, `open_navigator` logs one warning and the run has no
+  navigator, so `route_for` always returns None. A provider error at query time gives
+  `NoTarget(provider_unavailable)` for that milestone and every later one, with one warning.
+  Any other error inside a retrieval gives `NoTarget(failed)` with a warning. `NoTarget`
+  carries a `NoTargetReason`, and `TargetResolution` carries a `MapId` instead of separate
+  `package` and `version_code` fields.
 
 ## Testing
 

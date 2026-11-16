@@ -1,17 +1,20 @@
 import asyncio
-import functools
-import sqlite3
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Concatenate, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from artemis.app_memory.abstraction.constants import SYSTEM_UI_PACKAGES
 from artemis.app_memory.enrichment import Enrichment, StoreJob, open_enrichment
+from artemis.app_memory.guard import guarded
 from artemis.app_memory.harvester import Harvester
 from artemis.app_memory.interface import AppMemoryService, NoopAppMemory
-from artemis.app_memory.launcher import launcher_package
+from artemis.app_memory.launcher import installed_versions, launcher_package
+from artemis.app_memory.milestones import Milestone
+from artemis.app_memory.models import ScreenObservation
+from artemis.app_memory.navigator import Navigator, NavigatorFactory, open_navigator
 from artemis.app_memory.outcomes import parse_outcome
+from artemis.app_memory.routing import Route
 from artemis.app_memory.store import MapStore
 from artemis.app_memory.trace_reader import TraceReader
 from artemis.config.agent import AppMemoryConfig, load_agent_config
@@ -25,29 +28,7 @@ logger = get_logger(__name__)
 DB_FILE = "app_memory.db"
 CLOSE_TIMEOUT_SECONDS = 10.0
 
-P = ParamSpec("P")
-R = TypeVar("R")
-
-
-def guarded(
-    method: Callable[Concatenate["AppMemory", P], R],
-) -> Callable[Concatenate["AppMemory", P], R | None]:
-    """App memory never raises into the agent: log, and stop after a database error."""
-
-    @functools.wraps(method)
-    def run(self: "AppMemory", *args: P.args, **kwargs: P.kwargs) -> R | None:
-        if self.disabled:
-            return None
-        try:
-            return method(self, *args, **kwargs)
-        except Exception as exc:
-            logger.warning(f"App memory {method.__name__}{args} failed: {exc!r}", exc_info=True)
-            if isinstance(exc, sqlite3.DatabaseError):
-                self.disabled = True
-                logger.warning("App memory is disabled for the rest of this run.")
-            return None
-
-    return run
+T = TypeVar("T")
 
 
 class AppMemory:
@@ -61,9 +42,13 @@ class AppMemory:
         excluded: frozenset[str],
         engine: "DataEngine",
         enrichment: Enrichment | None = None,
+        navigator: NavigatorFactory | None = None,
     ) -> None:
         self.disabled = False
         self._enrichment = enrichment
+        self._open_navigator = navigator
+        self._navigator: Navigator | None = None
+        self._installed: dict[str, int] = {}
         self._db_path = db_path
         self._reader = reader
         self._excluded = excluded
@@ -91,6 +76,17 @@ class AppMemory:
         if self._enrichment is not None:
             self._enrichment.bind(asyncio.get_running_loop(), self._offload)
         await self._run(self._prepare, device_serial)
+        if self._open_navigator is not None:
+            self._navigator = self._open_navigator(self._read, self._installed)
+
+    @guarded
+    def request_targets(self, goal: str, milestones: Sequence[Milestone]) -> None:
+        if self._navigator is not None and not self._closed:
+            self._navigator.request(goal, milestones)
+
+    @guarded
+    def route_for(self, milestone_key: str, observation: ScreenObservation) -> Route | None:
+        return self._navigator.route_for(milestone_key, observation) if self._navigator else None
 
     async def finalize_session(self, session_id: str, outcome: str) -> None:
         await self._run(self._finalize, session_id, outcome)
@@ -107,6 +103,8 @@ class AppMemory:
         self._executor.shutdown(wait=False)
 
     async def _drain(self) -> None:
+        if self._navigator is not None:
+            await self._navigator.close()
         await self._engine.wait_for_writes()
         for session_id, outcome in self._ended.items():
             await self.finalize_session(session_id, outcome)
@@ -117,6 +115,9 @@ class AppMemory:
     async def _run(self, job: Callable[..., None], *args: Any) -> None:
         if not self._closed:
             await asyncio.wrap_future(self._executor.submit(job, *args))
+
+    async def _read(self, job: Callable[[MapStore], T]) -> T:
+        return await asyncio.wrap_future(self._executor.submit(lambda: job(self._open()[0])))
 
     def _open(self) -> tuple[MapStore, Harvester]:
         if self._store is None or self._harvester is None:
@@ -141,6 +142,7 @@ class AppMemory:
         launcher = launcher_package(device_serial) if device_serial else None
         if launcher:
             self._excluded |= {launcher}
+        self._installed = installed_versions(device_serial) if device_serial else {}
         self._open()[1].reconcile()
         self._harvested()
 
@@ -178,6 +180,7 @@ def open_app_memory(engine: "DataEngine | None") -> AppMemoryService:
     reader = TraceReader(engine.storage, engine.global_base_dir)
     enrichment = open_enrichment(engine.ctx, config, engine.get_image_path)
     db_path = engine.global_base_dir / DB_FILE
-    memory = AppMemory(db_path, reader, excluded_packages(config), engine, enrichment)
+    navigator = open_navigator(engine.ctx, config)
+    memory = AppMemory(db_path, reader, excluded_packages(config), engine, enrichment, navigator)
     engine.subscribe(memory.on_event)
     return memory

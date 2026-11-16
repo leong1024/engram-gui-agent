@@ -63,6 +63,12 @@ class EmbeddingDoc:
         return hashlib.sha1(self.text.encode()).hexdigest()
 
 
+@dataclass(frozen=True, slots=True)
+class VectorHit:
+    owner: Owner
+    similarity: float
+
+
 def vector_map_key(map_id: MapId) -> str:
     return f"{map_id.package}:{map_id.version_code}"
 

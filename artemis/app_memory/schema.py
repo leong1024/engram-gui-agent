@@ -88,6 +88,7 @@ TABLES: tuple[str, ...] = (
         PRIMARY KEY (owner_kind, owner_id, model_id))""",
     "CREATE INDEX IF NOT EXISTS idx_states_map ON states (package, version_code)",
     "CREATE INDEX IF NOT EXISTS idx_edges_src ON edges (src_state_id)",
+    "CREATE INDEX IF NOT EXISTS idx_edges_dst ON edges (dst_state_id)",
     "CREATE INDEX IF NOT EXISTS idx_observations_edge ON observations (edge_id)",
 )
 
@@ -112,5 +113,5 @@ def vector_table_ddl(model: EmbeddingModel) -> str:
     return (
         f"CREATE VIRTUAL TABLE IF NOT EXISTS {vector_table_name(model.model_id)} "
         "USING vec0(map_key TEXT PARTITION KEY, owner_kind TEXT, "
-        f"+owner_id TEXT, embedding FLOAT[{int(model.dim)}])"
+        f"+owner_id TEXT, embedding FLOAT[{int(model.dim)}] distance_metric=cosine)"
     )
