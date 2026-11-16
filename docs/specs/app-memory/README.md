@@ -24,8 +24,9 @@ an advisory hint. Execution itself is unchanged.
 
 ## Status
 
-Draft. Design agreed in conversation on 2026-11-16. Waiting for spec review, then an
-implementation plan.
+Draft. Design agreed in conversation on 2026-11-16. The
+[implementation plan](implementation-plan.md) splits the build into six stacked PRs, P1 to P6,
+and waits for the operator's go.
 
 ## Reading order
 
@@ -36,6 +37,8 @@ implementation plan.
 5. [retrieval](retrieval.md): descriptions, embeddings, two-tier target search.
 6. [routing-and-hints](routing-and-hints.md): localization, Dijkstra, hint format, divergence.
 7. [integration-pro](integration-pro.md): graph node, Operator prompt component, config.
+8. [implementation-plan](implementation-plan.md): the six PRs, their checks, and the
+   corrections to this spec found while planning.
 
 ## Decisions
 
