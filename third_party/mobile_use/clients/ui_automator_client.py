@@ -48,8 +48,8 @@ logger = get_logger(__name__)
 
 
 MAESTRO_PACKAGE = "dev.mobile.maestro"
-_RESUMED_ACTIVITY_CMD = "dumpsys activity activities | grep ResumedActivity"
-_ACTIVITY_TIMEOUT_S = 1.0
+RESUMED_ACTIVITY_CMD = "dumpsys activity activities | grep ResumedActivity"
+ACTIVITY_TIMEOUT_S = 1.0
 
 # Boolean attributes of a UIAutomator hierarchy node.
 UIAUTOMATOR_BOOL_ATTRIBUTES = (
@@ -458,7 +458,7 @@ class UIAutomatorClient:
 
     def _resumed_activity(self, device: "Device") -> str | None:
         try:
-            dump = device.shell(_RESUMED_ACTIVITY_CMD, timeout=_ACTIVITY_TIMEOUT_S).output
+            dump = device.shell(RESUMED_ACTIVITY_CMD, timeout=ACTIVITY_TIMEOUT_S).output
         except (OSError, RuntimeError, u2.exceptions.DeviceError) as exc:
             logger.debug(f"Reading the resumed activity on {self._device_id} failed: {exc}")
             return None

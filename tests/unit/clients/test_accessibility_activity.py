@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import subprocess
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -47,14 +48,20 @@ def _screen_data(snapshot: dict[str, Any]):
         return AccessibilityClient("dev", manager=_Manager()).get_screen_data()
 
 
+def _dumpsys(**kwargs):
+    return patch("artemis.clients.accessibility_client.subprocess.run", **kwargs)
+
+
 def test_recorded_snapshot_activity_is_on_the_screen_data():
-    data = _screen_data(SNAPSHOT)
+    with _dumpsys() as run:
+        data = _screen_data(SNAPSHOT)
 
     assert data.activity == "com.android.settings.Settings"
     assert data.ui_backend == "helper"
+    run.assert_not_called()
 
 
-@pytest.mark.parametrize(
+WITHOUT_ACTIVITY = pytest.mark.parametrize(
     "snapshot",
     [
         {k: v for k, v in SNAPSHOT.items() if k != "activity"},
@@ -62,8 +69,22 @@ def test_recorded_snapshot_activity_is_on_the_screen_data():
     ],
     ids=["older-helper-without-activity", "no-window-change-yet"],
 )
-def test_snapshot_without_an_activity_gives_none(snapshot):
-    assert _screen_data(snapshot).activity is None
+
+
+@WITHOUT_ACTIVITY
+def test_snapshot_without_an_activity_falls_back_to_dumpsys(snapshot):
+    dump = "  topResumedActivity=ActivityRecord{5d2a1c u0 com.android.settings/.Settings t12}\n"
+    with _dumpsys(return_value=subprocess.CompletedProcess([], 0, stdout=dump)) as run:
+        data = _screen_data(snapshot)
+
+    assert data.activity == "com.android.settings.Settings"
+    assert run.call_args.kwargs["timeout"] == 1.0
+
+
+@WITHOUT_ACTIVITY
+def test_no_activity_anywhere_gives_none(snapshot):
+    with _dumpsys(side_effect=subprocess.TimeoutExpired("adb", 1.0)):
+        assert _screen_data(snapshot).activity is None
 
 
 def test_activity_survives_the_adb_screencap_path():
