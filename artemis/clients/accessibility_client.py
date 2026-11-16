@@ -57,10 +57,13 @@ from artemis.runtime.helper_manager import (
     helper_manager,
 )
 from third_party.mobile_use.clients.ui_automator_client import (
+    ACTIVITY_TIMEOUT_S,
+    RESUMED_ACTIVITY_CMD,
     UIAUTOMATOR_BOOL_ATTRIBUTES,
     UIAutomatorScreenData,
     parse_hierarchy_xml_to_elements,
     pil_to_base64,
+    resumed_activity_class,
 )
 from third_party.mobile_use.utils.logger import get_logger
 
@@ -343,9 +346,26 @@ class AccessibilityClient:
             return xml, parse_hierarchy_xml_to_elements(xml)
         return "", normalize_helper_elements(dump.get("elements"))
 
+    def _resumed_activity(self) -> str | None:
+        """``dumpsys`` fallback for a snapshot without an activity (older helper, fresh start)."""
+        try:
+            result = subprocess.run(
+                adb_command(["-s", self._device_id, "shell", RESUMED_ACTIVITY_CMD]),
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                timeout=ACTIVITY_TIMEOUT_S,
+                check=True,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            logger.debug(f"Reading the resumed activity on {self._device_id} failed: {exc}")
+            return None
+        return resumed_activity_class(result.stdout)
+
     def get_screen_data(self) -> UIAutomatorScreenData:
         snapshot = self._snapshot()
         xml, elements = self._elements_from_dump(snapshot)
+        activity = _activity(snapshot) or self._resumed_activity()
         if snapshot.get("has_screenshot") and snapshot.get("screenshot_base64"):
             width, height = _dimensions(snapshot)
             return UIAutomatorScreenData(
@@ -354,6 +374,8 @@ class AccessibilityClient:
                 elements=elements,
                 width=width,
                 height=height,
+                activity=activity,
+                ui_backend="helper",
             )
 
         # Android 10 and below (or a rate-limited capture that did not recover):
@@ -370,6 +392,8 @@ class AccessibilityClient:
             elements=elements,
             width=screenshot.width,
             height=screenshot.height,
+            activity=activity,
+            ui_backend="helper",
         )
 
     # ------------------------------------------------------------------ #
@@ -422,6 +446,12 @@ def _read_error_body(exc: urllib.error.HTTPError) -> str:
         return exc.read().decode("utf-8", "replace")
     except OSError:
         return str(exc)
+
+
+def _activity(snapshot: dict[str, Any]) -> str | None:
+    """The helper's last window-state class; it is "" until the first window change."""
+    activity = snapshot.get("activity")
+    return activity if isinstance(activity, str) and activity else None
 
 
 def _dimensions(snapshot: dict[str, Any]) -> tuple[int, int]:

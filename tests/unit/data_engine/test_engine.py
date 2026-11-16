@@ -13,11 +13,14 @@
 # limitations under the License.
 
 import asyncio
+import hashlib
 import json
 from unittest.mock import MagicMock, patch
 
 from artemis.context import ArtemisContext
+from artemis.controllers.device_controller import ScreenDataResponse
 from artemis.data_engine.engine import DataEngine
+from artemis.runtime.app_versions import AppVersion
 
 
 def test_ipc_send_reconnects_and_retries_current_event(tmp_path):
@@ -438,6 +441,75 @@ def test_record_step_without_app_data_stamps_nothing(tmp_path):
 
     step = engine.storage.get_steps(engine.current_session_id)[0]
     assert "foreground_app" not in (step.extra_metadata or {})
+
+
+# --- Screen identity: activity, app version, UI backend ------------------------------
+
+
+class _InstalledVersions:
+    def __init__(self, versions: dict[str, AppVersion]):
+        self.versions = versions
+
+    def lookup(self, package):
+        return self.versions.get(package, AppVersion())
+
+
+def _observe(engine, screenshot: bytes, activity: str, package: str) -> None:
+    engine.note_observed_screen(
+        hashlib.sha256(screenshot).hexdigest(),
+        ScreenDataResponse(activity=activity, ui_backend="helper"),
+        ui_tree=[{"package": package, "bounds": "[0,0][10,10]"}],
+    )
+
+
+def _recorded_metadata(engine) -> dict:
+    for t in list(engine._pending_threads):
+        t.join()
+    return engine.storage.get_steps(engine.current_session_id)[0].extra_metadata
+
+
+def test_step_records_the_identity_of_its_pre_action_screen(tmp_path):
+    engine = _foreground_engine(tmp_path)
+    engine.app_versions = _InstalledVersions({"com.android.settings": AppVersion(34, "14")})
+    _observe(engine, b"settings home", "com.android.settings.Settings", "com.android.settings")
+    _observe(engine, b"battery page", "com.android.settings.SubSettings", "com.android.settings")
+
+    engine.record_step(
+        pre_screenshot_bytes=b"settings home",
+        post_screenshot_bytes=b"battery page",
+        summary="Opened Battery",
+    )
+
+    metadata = _recorded_metadata(engine)
+    assert metadata["foreground_app"] == "com.android.settings"
+    assert metadata["activity"] == "com.android.settings.Settings"
+    assert metadata["version_code"] == 34
+    assert metadata["version_name"] == "14"
+    assert metadata["ui_backend"] == "helper"
+
+
+def test_step_on_an_unknown_screen_records_none_for_each_identity_key(tmp_path):
+    engine = _foreground_engine(tmp_path)
+
+    engine.record_step(pre_screenshot_bytes=b"never observed", summary="No observation")
+
+    metadata = _recorded_metadata(engine)
+    for key in ("activity", "version_code", "version_name", "ui_backend"):
+        assert key in metadata and metadata[key] is None
+
+
+def test_unknown_version_is_none_while_the_rest_is_recorded(tmp_path):
+    engine = _foreground_engine(tmp_path)
+    engine.app_versions = _InstalledVersions({})
+    _observe(
+        engine, b"chrome", "org.chromium.chrome.browser.ChromeTabbedActivity", "com.android.chrome"
+    )
+
+    engine.record_step(pre_screenshot_bytes=b"chrome", summary="Opened Chrome")
+
+    metadata = _recorded_metadata(engine)
+    assert metadata["activity"] == "org.chromium.chrome.browser.ChromeTabbedActivity"
+    assert metadata["version_code"] is None and metadata["version_name"] is None
 
 
 # --- Agent-friendly single-step / range lookups (step replay backing) ----------------

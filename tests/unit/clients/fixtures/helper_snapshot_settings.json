@@ -1,0 +1,15 @@
+{
+  "success": true,
+  "node_count": 2,
+  "skipped_invisible": 0,
+  "truncated": false,
+  "window_count": 1,
+  "elapsed_ms": 41,
+  "package": "com.android.settings",
+  "activity": "com.android.settings.Settings",
+  "has_screenshot": true,
+  "screenshot_base64": "QUJD",
+  "width": 1080,
+  "height": 2400,
+  "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><hierarchy rotation=\"0\"><node index=\"0\" text=\"\" resource-id=\"com.android.settings:id/main_content\" class=\"android.widget.FrameLayout\" package=\"com.android.settings\" content-desc=\"\" checkable=\"false\" checked=\"false\" clickable=\"false\" enabled=\"true\" focusable=\"false\" focused=\"false\" scrollable=\"false\" long-clickable=\"false\" password=\"false\" selected=\"false\" visible-to-user=\"true\" bounds=\"[0,0][1080,2400]\"><node index=\"0\" text=\"Battery\" resource-id=\"android:id/title\" class=\"android.widget.TextView\" package=\"com.android.settings\" content-desc=\"\" checkable=\"false\" checked=\"false\" clickable=\"true\" enabled=\"true\" focusable=\"true\" focused=\"false\" scrollable=\"false\" long-clickable=\"false\" password=\"false\" selected=\"false\" visible-to-user=\"true\" bounds=\"[48,900][1032,1020]\" /></node></hierarchy>"
+}

@@ -73,11 +73,17 @@ The wiring lives in [sdk/agent.py](../../../artemis/sdk/agent.py) and the shared
 2. **Prepare.** Call `await ctx.app_memory.prepare_run(device_serial=...)`. This happens inside
    the device lock, before the agent loop. It loads installed versions, reconciles stale
    sessions and re-queues pending descriptions.
-3. **Listen.** Register `ctx.data_engine.add_step_listener(ctx.app_memory.on_step_recorded)`.
-   The listener hook is new in the DataEngine and runs on its background scheduler.
-4. **Finalize.** In `_finalize_tracing_safely`, once the task status is resolved, call
-   `await ctx.app_memory.finalize_session(session_id, outcome)` and then `close()`. `close`
-   waits at most 5 s for in-flight description jobs; the rest stay `pending`.
+3. **Listen.** Register `ctx.data_engine.subscribe(callback)`. The existing `subscribe` already
+   delivers `step_recorded` and `session_ended` events, so no listener hook is added. The
+   callback passes `step_recorded` to `ctx.app_memory.on_step_recorded` off the agent's hot
+   path. Live harvesting is best-effort, and the post-run pass sweeps the whole session
+   idempotently.
+4. **Finalize.** On the `session_ended` event, call
+   `await ctx.app_memory.finalize_session(session_id, outcome)`. Not in
+   `_finalize_tracing_safely`: `async with context` exits before it runs, so the DataEngine is
+   already shut down there. `ArtemisContext.__aexit__` calls `close()` before the DataEngine
+   shuts down, which flushes app memory. `close` waits at most 5 s for in-flight description
+   jobs; the rest stay `pending`.
 
 Every call is wrapped so that an app memory error is logged and never changes the task result.
 

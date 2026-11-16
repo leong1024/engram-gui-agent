@@ -167,6 +167,29 @@ async def test_android_driver_parses_xml_hierarchy_fallback():
 
     assert screen_data.ui_hierarchy_xml is not None
     assert any(element.get("text") == "Settings" for element in screen_data.ui_elements)
+    assert screen_data.activity is None and screen_data.ui_backend is None
+
+
+@pytest.mark.asyncio
+async def test_android_driver_carries_the_client_screen_identity():
+    mock_ui_client = MagicMock()
+    mock_ui_client.get_screen_data.return_value = SimpleNamespace(
+        base64=_ONE_PIXEL_PNG,
+        hierarchy_xml="<hierarchy />",
+        elements=[],
+        width=1080,
+        height=2400,
+        activity="com.android.settings.Settings",
+        ui_backend="helper",
+    )
+    driver = AndroidAdbDriver(
+        device_id="emulator-5554", adb_client=MagicMock(), ui_adb_client=mock_ui_client
+    )
+
+    screen_data = await driver.get_screen_data(skip_settling=True)
+
+    assert screen_data.activity == "com.android.settings.Settings"
+    assert screen_data.ui_backend == "helper"
 
 
 @pytest.mark.asyncio

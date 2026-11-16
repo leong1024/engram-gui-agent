@@ -777,3 +777,17 @@ async def test_cloud_mode_command_has_hard_timeout(mock_ctx, monkeypatch):
     with patch("artemis.tools.command_tool.get_adb_device", return_value=device):
         res = await run_command.ainvoke({"CommandLine": "echo fast", "WaitMsBeforeAsync": 500})
     assert "fast" in res
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("get_tool", [get_run_adb_command_tool, get_run_short_adb_command_tool])
+@patch("asyncio.create_subprocess_exec")
+async def test_adb_commands_reach_the_app_version_cache(mock_exec, get_tool, mock_ctx):
+    mock_exec.return_value = MockProcess(output_bytes=b"Success\n", exit_code=0)
+    mock_ctx.data_engine = MagicMock()
+
+    await get_tool(mock_ctx).ainvoke({"CommandLine": "pm install -r /data/local/tmp/app.apk"})
+
+    mock_ctx.data_engine.app_versions.note_adb_command.assert_called_once_with(
+        "pm install -r /data/local/tmp/app.apk"
+    )

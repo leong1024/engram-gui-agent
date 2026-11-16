@@ -39,8 +39,14 @@ from artemis.data_engine.models import (
     TraceRecord,
     VideoRecordingRecord,
 )
+from artemis.data_engine.screen_identity import (
+    ObservedScreen,
+    ScreenSource,
+    screen_identity_fields,
+)
 from artemis.data_engine.storage import StorageManager
 from artemis.data_engine.trace import CURRENT_TRACE_ID
+from artemis.runtime.app_versions import AppVersion, AppVersionCache, adb_shell_runner
 from artemis.utils.coordinates import (
     normalize_any_structure,
     normalize_step_actions,
@@ -420,6 +426,8 @@ class DataEngine:
         self._bg_task_to_trace_id = {}
         self._trace_name_cache = {}
         self._step_number_cache: dict[str, int] = {}
+        self._observed_screens: dict[str, ObservedScreen] = {}
+        self.app_versions: AppVersionCache | None = None
         # Background tasks are written directly to SQLite storage
 
         self.ipc_socket = None
@@ -592,6 +600,7 @@ class DataEngine:
                 session_id = uuid4()
         self.current_session_id = session_id
         self.session_start_time = time.time()
+        self._open_app_versions()
 
         # Clear old pause file if it exists
         pause_file = PAUSE_FILE
@@ -846,6 +855,36 @@ class DataEngine:
 
         return image_name
 
+    def note_observed_screen(self, image_name: str, screen: ScreenSource, ui_tree: Any) -> None:
+        """Remember who showed this screenshot, for the step that later acts on it."""
+        self._observed_screens[image_name] = ObservedScreen(
+            activity=screen.activity,
+            ui_backend=screen.ui_backend,
+            foreground_app=_derive_foreground_app(ui_tree),
+        )
+
+    def _stamp_screen_identity(
+        self, extra_metadata: dict[str, Any], pre_image_name: str | None
+    ) -> None:
+        screen = self._observed_screens.get(pre_image_name) if pre_image_name else None
+        if screen is not None and screen.foreground_app:
+            extra_metadata.setdefault("foreground_app", screen.foreground_app)
+        app = extra_metadata.get("foreground_app")
+        version = self.app_versions.lookup(app) if self.app_versions else AppVersion()
+        for key, value in screen_identity_fields(screen, version).items():
+            extra_metadata.setdefault(key, value)
+
+    def _open_app_versions(self) -> None:
+        """One version cache per session, loading in the background from the start."""
+        if self.app_versions is not None:
+            self.app_versions.close()
+        self.app_versions = None
+        self._observed_screens.clear()
+        serial = getattr(getattr(self.ctx, "device", None), "device_id", None)
+        if isinstance(serial, str) and serial:
+            self.app_versions = AppVersionCache(adb_shell_runner(serial))
+            self.app_versions.prefetch()
+
     def get_image_path(self, image_name: str) -> Path:
         """Get the absolute file path of an image by its name/hash."""
         return self.global_base_dir / "images" / f"{image_name}.jpg"
@@ -909,6 +948,7 @@ class DataEngine:
                 extra_metadata.setdefault("foreground_app", app)
         except (AttributeError, TypeError, ValueError):
             pass
+        self._stamp_screen_identity(extra_metadata, pre_image_name)
 
         # Stamp perceptual hashes for the local screen-similarity hint
         # (pure PIL dHash; best-effort, computed synchronously to keep the

@@ -27,6 +27,8 @@ from artemis.agents.validator.tool_declarations import (
     ToolExecutionResult,
 )
 from artemis.context import ArtemisContext
+from artemis.controllers.device_controller import ScreenDataResponse
+from artemis.data_engine.engine import DataEngine
 
 
 @pytest.fixture
@@ -292,9 +294,7 @@ def _record(runner, name, args, metadata=None):
         metadata=metadata or {},
         ui_elements_text="ui",
     )
-    step_id = runner._record_action_step(
-        name, args, exec_result, "thought", {}, b"pre", ["xml"], b"post"
-    )
+    step_id = runner._record_action_step(name, args, exec_result, "thought", {}, b"pre", b"post")
     assert step_id == "step-1"
     return runner.ctx.data_engine.record_step.call_args.kwargs["action_taken"]
 
@@ -498,6 +498,51 @@ def test_extract_response_thinking_reads_only_thinking_blocks(mock_context):
     )
 
 
+def _flash_runner_on_engine(mock_context, tmp_path):
+    with patch("artemis.controllers.unified_controller.get_driver"):
+        runner = FlashRunner(mock_context, goal="g")
+    engine_ctx = Mock(spec=ArtemisContext, device=None)
+    engine_ctx.execution_setup = SimpleNamespace(traces_path=str(tmp_path))
+    engine = DataEngine(engine_ctx)
+    engine.start_session("open battery")
+    runner.ctx.data_engine = engine
+    return runner, engine
+
+
+def _record_tap(runner, engine):
+    exec_result = SimpleNamespace(
+        status="success", text_summary="tapped", metadata={}, ui_elements_text="1. Battery"
+    )
+    runner._record_action_step("click", {"target": [1, 2]}, exec_result, "t", {}, b"pre", b"post")
+    for thread in list(engine._pending_threads):
+        thread.join()
+    return engine.storage.get_steps(engine.current_session_id)[0]
+
+
+def test_flash_step_records_the_pre_action_tree_and_screen_identity(mock_context, tmp_path):
+    runner, engine = _flash_runner_on_engine(mock_context, tmp_path)
+    tree = [{"package": "com.android.settings", "text": "Battery", "bounds": "[0,0][9,9]"}]
+    for shot, activity in [(b"pre", "com.android.settings.Settings"), (b"post", "x.Other")]:
+        name = engine.get_or_create_image(shot, ui_tree=tree)
+        screen = ScreenDataResponse(activity=activity, ui_backend="helper")
+        engine.note_observed_screen(name, screen, tree)
+
+    step = _record_tap(runner, engine)
+
+    assert engine.storage.get_image(step.pre_image_name).ui_tree == tree
+    assert step.extra_metadata["foreground_app"] == "com.android.settings"
+    assert step.extra_metadata["activity"] == "com.android.settings.Settings"
+    assert step.extra_metadata["ui_backend"] == "helper"
+
+
+def test_flash_never_records_the_post_action_text_as_a_tree(mock_context, tmp_path):
+    runner, engine = _flash_runner_on_engine(mock_context, tmp_path)
+
+    step = _record_tap(runner, engine)
+
+    assert engine.storage.get_image(step.pre_image_name).ui_tree is None
+
+
 def test_record_action_step_persists_native_thinking(mock_context):
     from types import SimpleNamespace
 
@@ -517,7 +562,6 @@ def test_record_action_step_persists_native_thinking(mock_context):
         "thought",
         {},
         b"pre",
-        ["xml"],
         b"post",
         native_text="native summary",
     )
@@ -526,7 +570,7 @@ def test_record_action_step_persists_native_thinking(mock_context):
     assert kwargs["operator_native_thinking"] == "native summary"
 
     runner._record_action_step(
-        "click", {"target": [1, 2]}, exec_result, "thought", {}, b"pre", ["xml"], b"post"
+        "click", {"target": [1, 2]}, exec_result, "thought", {}, b"pre", b"post"
     )
     assert runner.ctx.data_engine.record_step.call_args.kwargs["operator_native_thinking"] is None
 
