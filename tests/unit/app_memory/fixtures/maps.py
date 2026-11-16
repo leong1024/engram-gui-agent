@@ -20,7 +20,7 @@ from tests.unit.app_memory.fixtures.parts import SETTINGS, element
 
 SETTINGS_MAP = MapId(SETTINGS, 34)
 NOW = 1_700_000_000.0
-ROWS = ("alpha", "beta", "gamma", "delta")
+ROWS = 4
 
 
 def tap(
@@ -35,20 +35,21 @@ def launch(package: str = SETTINGS) -> CanonicalAction:
 
 
 def page(name: str, package: str = SETTINGS, version_code: int = 34) -> ScreenObservation:
-    """A screen whose ids and labels all derive from `name`, so each name is its own state."""
+    """A screen whose title id and label derive from `name`, so each name is its own state."""
     slug = name.lower().replace(" ", "_")
-    elements = [
-        element(
-            "android.widget.TextView",
-            (0, 200 + 150 * index, 1080, 330 + 150 * index),
-            rid=f"{package}:id/{slug}_{row}",
-            text=f"{name} {row}",
-            package=package,
-        )
-        for index, row in enumerate(("title", *ROWS))
+    title = element(
+        "android.widget.TextView",
+        (0, 100, 1080, 200),
+        rid=f"{package}:id/{slug}_title",
+        text=name,
+        package=package,
+    )
+    rows = [
+        element("android.view.View", (0, 300 + 150 * i, 1080, 430 + 150 * i), package=package)
+        for i in range(ROWS)
     ]
     activity = "." + name.title().replace(" ", "")
-    return ScreenObservation(package, activity, version_code, tuple(elements))
+    return ScreenObservation(package, activity, version_code, (title, *rows))
 
 
 @dataclass
