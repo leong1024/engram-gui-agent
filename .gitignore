@@ -116,3 +116,8 @@ live_screenshot*.png
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Obsidian (docs/specs vault): per-user state
+.obsidian/workspace*.json
+.obsidian/cache
+.trash/
