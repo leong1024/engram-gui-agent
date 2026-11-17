@@ -1,7 +1,5 @@
-<h1 align="center">engram</h1>
-
 <p align="center">
-  <strong>The self-learning Android agent that remembers every app it touches.</strong>
+  <img src="./docs/assets/brand/engram-banner.png" alt="engram: the self-learning Android agent that remembers every app it touches" width="100%" />
 </p>
 
 <p align="center">

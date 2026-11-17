@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="engram">
+  <defs>
+    <linearGradient id="bg" x1="0.15" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#2E3380"/>
+      <stop offset="0.55" stop-color="#14173A"/>
+      <stop offset="1" stop-color="#080919"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="0.5" cy="0" r="0.9">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.20"/>
+      <stop offset="0.6" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rim" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.45"/>
+      <stop offset="0.5" stop-color="#FFFFFF" stop-opacity="0.04"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.14"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.03"/>
+    </linearGradient>
+    <linearGradient id="frame" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.45"/>
+    </linearGradient>
+    <linearGradient id="route" x1="0.2" y1="1" x2="0.5" y2="0">
+      <stop offset="0" stop-color="#8B93FF"/>
+      <stop offset="1" stop-color="#5EEAD4"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#5EEAD4" stop-opacity="0.75"/>
+      <stop offset="0.45" stop-color="#5EEAD4" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#5EEAD4" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="core" cx="0.4" cy="0.35" r="0.7">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.45" stop-color="#9FF5E6"/>
+      <stop offset="1" stop-color="#2DD4BF"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="229" fill="url(#bg)"/>
+  <rect width="1024" height="1024" rx="229" fill="url(#sheen)"/>
+  <rect x="2" y="2" width="1020" height="1020" rx="227" fill="none" stroke="url(#rim)" stroke-width="4"/>
+
+  <g transform="translate(512 500) scale(1.14) translate(-512 -512)">
+  <rect x="352" y="188" width="320" height="648" rx="88" fill="url(#glass)" stroke="url(#frame)" stroke-width="20"/>
+  <rect x="462" y="224" width="100" height="14" rx="7" fill="#FFFFFF" fill-opacity="0.5"/>
+  <rect x="452" y="800" width="120" height="10" rx="5" fill="#FFFFFF" fill-opacity="0.32"/>
+
+  <circle cx="480" cy="344" r="132" fill="url(#glow)"/>
+  <circle cx="480" cy="344" r="86" fill="none" stroke="#5EEAD4" stroke-opacity="0.30" stroke-width="4"/>
+  <circle cx="480" cy="344" r="60" fill="none" stroke="#5EEAD4" stroke-opacity="0.55" stroke-width="4"/>
+
+  <path d="M448 688 C448 612 576 614 576 524 C576 444 480 436 480 344" fill="none" stroke="url(#route)" stroke-width="10" stroke-linecap="round" stroke-opacity="0.55" filter="url(#soft)"/>
+  <path d="M448 688 C448 612 576 614 576 524 C576 444 480 436 480 344" fill="none" stroke="url(#route)" stroke-width="9" stroke-linecap="round"/>
+
+  <circle cx="448" cy="688" r="22" fill="#14173A" stroke="#8B93FF" stroke-width="9"/>
+  <circle cx="576" cy="524" r="22" fill="#14173A" stroke="#A3B8FF" stroke-width="9"/>
+  <circle cx="480" cy="344" r="34" fill="url(#core)"/>
+  </g>
+  <ellipse cx="512" cy="905" rx="170" ry="26" fill="#000000" fill-opacity="0.35" filter="url(#soft)"/>
+</svg>
