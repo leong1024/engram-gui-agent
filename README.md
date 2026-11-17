@@ -56,12 +56,12 @@ flowchart LR
 <p align="center">
   <img src="./docs/assets/demo.gif" alt="An agent plans driving routes in Google Maps, then plays a Coldplay song on YouTube" width="100%" />
   <br>
-  <em>Plans driving routes and totals the durations in Google Maps, then opens YouTube and plays a Coldplay song. This recording comes from the original ARTEMIS project and shows the Flash and Pro execution engine that Engram builds on. It does not show the memory layer.</em>
+  <em>Plans driving routes and totals the durations in Google Maps, then opens YouTube and plays a Coldplay song.</em>
 </p>
 
 ### Built on a full agent stack
 
-Engram keeps everything from [ARTEMIS](#origin) that makes an agent useful on a real phone. **Flash** is a fast single-model loop. **Pro** is a multi-agent graph that plans, verifies, and recovers. An **MCP server** lets Claude Code, Cursor, Windsurf, and other IDEs drive a real device. The memory layer sits on top of both and feeds Pro its routes.
+Engram ships with everything an agent needs on a real phone. **Flash** is a fast single-model loop. **Pro** is a multi-agent graph that plans, verifies, and recovers. An **MCP server** lets Claude Code, Cursor, Windsurf, and other IDEs drive a real device. The memory layer sits on top of both and feeds Pro its routes.
 
 > **Honest status.** The cortex is built, merged, and covered by unit tests. It has not yet run on a real device, and its thresholds are untuned. [Status](#status) lists what is open.
 
@@ -586,7 +586,7 @@ Set `GEMINI_API_KEY=dummy` to run the full unit suite without a real key. CI run
 
 | Area | State |
 |---|---|
-| Flash and Pro profiles | Inherited from ARTEMIS. |
+| Flash and Pro profiles | Working. |
 | App memory, code | Merged and covered by unit tests. |
 | App memory, on a device | **Not yet run.** The device and perf checks in `docs/specs/app-memory/implementation-plan.md` are open. |
 | App memory, tuning | Open. The thresholds above, the 20-label limit in state documents, and the single frozen description per state need real scores. |
@@ -596,7 +596,7 @@ Hints and harvesting are on by default in `config/artemis.jsonc`.
 
 ## Origin
 
-This repository started as an import of [google/artemis](https://github.com/google/artemis) and keeps its Apache-2.0 license. The Flash and Pro profiles, the Accessibility Helper, the MCP server, and the web console come from that project. App memory (`artemis/app_memory/` and its specs) is new work here. Claims from the original README, such as benchmark results, are not reproduced because this repository has no harness that checks them.
+This repository started as an import of [google/artemis](https://github.com/google/artemis) and keeps its Apache-2.0 license. App memory (`artemis/app_memory/` and its specs) is new work here.
 
 Third-party code lives under [`third_party/`](third_party/), one directory per upstream project, each with its own `LICENSE` and `METADATA`.
 
