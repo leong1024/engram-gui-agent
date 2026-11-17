@@ -51,6 +51,14 @@ flowchart LR
 - **It cannot break the run.** Memory is advisory. The agent keeps full control, and a fault in the memory layer is built not to change the result of a task. A unit test with a mock device covers it.
 - **It is a real system, not a prompt.** Harvesting, enrichment, vector search, and routing run as separate background services, with the failure handling to match.
 
+### See it drive a real phone
+
+<p align="center">
+  <img src="./docs/assets/demo.gif" alt="An agent plans driving routes in Google Maps, then plays a Coldplay song on YouTube" width="100%" />
+  <br>
+  <em>Plans driving routes and totals the durations in Google Maps, then opens YouTube and plays a Coldplay song. This recording comes from the original ARTEMIS project and shows the Flash and Pro execution engine that Engram builds on. It does not show the memory layer.</em>
+</p>
+
 ### Built on a full agent stack
 
 Engram keeps everything from [ARTEMIS](#origin) that makes an agent useful on a real phone. **Flash** is a fast single-model loop. **Pro** is a multi-agent graph that plans, verifies, and recovers. An **MCP server** lets Claude Code, Cursor, Windsurf, and other IDEs drive a real device. The memory layer sits on top of both and feeds Pro its routes.
