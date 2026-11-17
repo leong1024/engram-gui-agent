@@ -767,6 +767,13 @@ class AppMemoryHarvestConfig(BaseModel):
     model_config = {"extra": "allow"}
 
 
+class AppMemoryHintsConfig(BaseModel):
+    """Advisory routes in the Pro Operator prompt (agent.app_memory.hints)."""
+
+    enabled: bool = Field(default=True, description="Whether the Pro Operator is shown routes.")
+    model_config = {"extra": "allow"}
+
+
 EmbeddingProviderName = Literal["gemini", "openai", "ollama"]
 
 
@@ -794,11 +801,20 @@ class AppMemoryConfig(BaseModel):
         default_factory=AppMemoryHarvestConfig,
         description="Harvesting options.",
     )
+    hints: AppMemoryHintsConfig = Field(
+        default_factory=AppMemoryHintsConfig,
+        description="Route hints for the Pro Operator.",
+    )
     embedding: AppMemoryEmbeddingConfig = Field(
         default_factory=AppMemoryEmbeddingConfig,
         description="Embedding model for retrieval.",
     )
     model_config = {"extra": "allow"}
+
+    @property
+    def hints_on(self) -> bool:
+        """Routes come from the maps that harvesting builds, so hints need it on too."""
+        return self.enabled and self.harvest.enabled and self.hints.enabled
 
 
 class FlashProfileConfig(BaseModel):

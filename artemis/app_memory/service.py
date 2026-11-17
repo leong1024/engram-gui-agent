@@ -186,7 +186,7 @@ def open_app_memory(engine: "DataEngine | None") -> AppMemoryService:
     reader = TraceReader(engine.storage, engine.global_base_dir)
     enrichment = open_enrichment(engine.ctx, config, engine.get_image_path)
     db_path = engine.global_base_dir / DB_FILE
-    navigator = open_navigator(engine.ctx, config)
+    navigator = open_navigator(engine.ctx, config) if config.hints_on else None
     memory = AppMemory(db_path, reader, excluded_packages(config), engine, enrichment, navigator)
     engine.subscribe(memory.on_event)
     return memory
