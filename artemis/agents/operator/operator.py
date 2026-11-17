@@ -81,6 +81,7 @@ from artemis.agents.operator.prompts import (
     TemplatePromptComponent,
     ObservationPromptComponent,
     PlanRecitationPromptComponent,
+    AppMemoryRoutePromptComponent,
     ScreenshotSimilarityPromptComponent,
     HistoricalStateHintPromptComponent,
     FeedbackPromptComponent,
@@ -246,6 +247,7 @@ class OperatorNode:
                     TemplatePromptComponent(),
                     {"template_name": "main_template"},
                 ),
+                (AppMemoryRoutePromptComponent(), {}),
                 (ExecutionIncidentPromptComponent(), {}),
                 (ObservationPromptComponent(), {}),
                 (ScreenshotSimilarityPromptComponent(), {}),
@@ -417,6 +419,7 @@ class OperatorNode:
         builder.add_human_content(f"# CURRENT OBSERVATION [{ledger.elapsed_label()}]")
         components = [
             (PlanRecitationPromptComponent(), {}),
+            (AppMemoryRoutePromptComponent(), {}),
             (ExecutionIncidentPromptComponent(), {}),
             (ObservationPromptComponent(), {}),
             (ScreenshotSimilarityPromptComponent(), {}),
