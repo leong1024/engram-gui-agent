@@ -1,16 +1,19 @@
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from artemis.app_memory import service
+from artemis.app_memory import plan_routes, service
 from artemis.app_memory.harvester import Harvester
 from artemis.app_memory.interface import NoopAppMemory
 from artemis.config.agent import AgentGlobalConfig
 from artemis.context import ArtemisContext, DeviceContext, ExecutionSetup
 from artemis.data_engine.engine import DataEngine
 from tests.unit.app_memory.fixtures import screens
+from tests.unit.app_memory.fixtures.pro_run import MILESTONE, pro_run, script_pro_run
 from tests.unit.app_memory.fixtures.traces import MapView, tap
+from tests.unit.conftest import HINTS_OFF, HINTS_ON
 
 TABS = ("Alarm", "Timer", "Stopwatch")
 
@@ -56,11 +59,12 @@ async def test_a_run_is_finalized_when_its_context_exits(tmp_path):
     assert [status for _, _, status in view.observations(session_id)] == ["confirmed"] * 2
 
 
+def explode(*args: Any, **kwargs: Any) -> None:
+    raise RuntimeError("harvester exploded")
+
+
 @pytest.mark.asyncio
 async def test_a_failing_harvester_never_changes_the_task_result(tmp_path, monkeypatch):
-    def explode(*args, **kwargs):
-        raise RuntimeError("harvester exploded")
-
     for name in ("harvest_live", "finalize", "reconcile", "backfill"):
         monkeypatch.setattr(Harvester, name, explode)
 
@@ -87,3 +91,40 @@ def test_switched_off_app_memory_writes_nothing(tmp_path, monkeypatch, block):
 
     assert isinstance(service.open_app_memory(ctx.data_engine), NoopAppMemory)
     assert not (tmp_path / service.DB_FILE).exists()
+
+
+class RaisingNavigator:
+    """Fails every hint call, and counts them so the test knows the faults were reached."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def request(self, goal: str, milestones: Any) -> None:
+        self.calls += 1
+        raise RuntimeError("retrieval exploded")
+
+    def route_for(self, milestone_key: str, observation: Any) -> None:
+        self.calls += 1
+        raise RuntimeError("routing exploded")
+
+    async def close(self) -> None:
+        pass
+
+
+@pytest.mark.asyncio
+async def test_a_pro_run_with_failing_app_memory_ends_as_one_without_it(tmp_path, monkeypatch):
+    script_pro_run(monkeypatch)
+    for name in ("harvest_live", "finalize", "reconcile"):
+        monkeypatch.setattr(Harvester, name, explode)
+    navigator = RaisingNavigator()
+    monkeypatch.setattr(service, "open_navigator", lambda *args: lambda *a: navigator)
+    monkeypatch.setattr(plan_routes, "load_agent_config", lambda: HINTS_ON)
+
+    failing = context_for(tmp_path / "failing")
+    failing.app_memory = service.open_app_memory(failing.data_engine)
+    with_failing_memory = await pro_run(failing)
+    monkeypatch.setattr(plan_routes, "load_agent_config", lambda: HINTS_OFF)
+    without_memory = await pro_run(context_for(tmp_path / "off"))
+
+    assert with_failing_memory == without_memory == (f"- [x] {MILESTONE}\n", 1)
+    assert navigator.calls >= 3
