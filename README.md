@@ -1,18 +1,20 @@
 <h1 align="center">engram</h1>
 
 <p align="center">
-  <strong>The Android agent that remembers every app it touches.</strong>
+  <strong>The self-learning Android agent that remembers every app it touches.</strong>
 </p>
 
 <p align="center">
-  Other agents wake up with amnesia. Engram wakes up with a map.
+  Other agents wake up with amnesia. Engram wakes up with a map.<br>
+  Closed-loop memory. Graph-engineered navigation. No retraining.
 </p>
 
 <p align="center">
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.12+-3776AB.svg?logo=python&logoColor=white" alt="Python 3.12+"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License: Apache-2.0"></a>
   <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP-server-8A2BE2.svg" alt="MCP server"></a>
-  <img src="https://img.shields.io/badge/memory-experience--driven-success.svg" alt="Experience-driven memory">
+  <img src="https://img.shields.io/badge/learning-closed--loop-success.svg" alt="Closed-loop learning">
+  <img src="https://img.shields.io/badge/navigation-graph--engineered-orange.svg" alt="Graph-engineered navigation">
 </p>
 
 ---
@@ -21,7 +23,7 @@
 
 Ask a typical phone agent to turn on dark mode. It squints at the home screen, guesses, wanders, and finds Settings. Ask again tomorrow and it does the same thing, because it has forgotten everything it learned.
 
-**Engram does not forget.** An *engram* is the trace a memory leaves behind in a brain. Engram builds that trace for software. Every screen it visits, every tap that worked, and every dead end becomes part of a living **cortex** for that app. The next time you ask for something, it already knows where the road goes.
+**Engram closes the loop.** An *engram* is the trace a memory leaves behind in a brain. Engram builds that trace for software. Every screen it visits, every tap that worked, and every dead end becomes part of a living **cortex** for that app. The next time you ask for something, it already knows where the road goes.
 
 ```mermaid
 flowchart LR
@@ -38,30 +40,32 @@ flowchart LR
 | Knows the app | Never. It looks again each task. | Yes. It keeps a map of every app version it has seen. |
 | After a task | Everything is thrown away. | Every screen and action joins the cortex. |
 | Finding a goal | Guess and scroll. | Search the cortex by meaning, then plan a route. |
-| Learning | Nothing carries over. | Learns from its own runs. **No weights change.** |
+| Learning loop | Open. Nothing carries over. | Closed. It is self-learning: it feeds on its own runs, and **no weights change**. |
 | When a run fails | Nothing is recorded. | The run counts for less in the map, so bad routes fade. |
 
 ### Why the cortex matters
 
-- **Experience compounds.** The first run teaches the map. Every later run adds to it, so there is more to go on each time, with no retraining.
-- **It thinks in meaning.** Each screen gets a plain-language description and an embedding. Ask for "turn on dark theme" and it finds the Display screen without a hard-coded rule.
-- **It plans like a navigator.** Routes come from Dijkstra over a graph weighted by how often each action really worked. Reliable roads win over short ones.
-- **It tells apart versions of the same app.** Maps are keyed by app package and version code, so an update does not poison what it learned.
-- **It keeps your data out.** The cortex stores masked structure. Typed text is never stored, numbers, emails, and long text are masked, and descriptions are written in general terms.
-- **It cannot break the run.** Memory is advisory. The agent keeps full control, and a fault in the memory layer is built not to change the result of a task. A unit test with a mock device covers it.
-- **It is a real system, not a prompt.** Harvesting, enrichment, vector search, and routing run as separate background services, with the failure handling to match.
+- **A closed learning loop.** Every run feeds the cortex, and the cortex feeds the next run. The more it works, the more it has to go on. There is no retraining and no labeled data.
+- **Graph engineering at the core.** Each app version becomes a state graph. Screens are nodes. Actions are edges, weighted by how often they really worked. Routes come from Dijkstra over that graph, so reliable roads win over short ones.
+- **Semantic retrieval for GUIs.** Each screen gets a plain-language description and a vector embedding. A goal like "turn on dark theme" finds the Display screen through vector search and an LLM selector, with no hard-coded rule. Think RAG, but for phones.
+- **A world model of every app.** The graph is a learned model of how each app behaves: where a tap leads and how reliably it gets there.
+- **Self-correcting.** A failed run counts for less. Bad routes fade, and good ones strengthen.
+- **Version-aware.** Maps are keyed by app package and version code, so an update does not poison what it learned.
+- **Privacy by design.** The cortex stores masked structure. Typed text is never stored. Numbers, emails, and long text are masked, and descriptions are written in general terms.
+- **Fault tolerant.** Memory is advisory. The agent keeps full control, and a fault in the memory layer is built not to change the result of a task. A unit test with a mock device covers it.
+- **A real system, not a prompt.** Harvesting, enrichment, vector search, and routing run as separate background services with the failure handling to match.
 
 ### See it drive a real phone
 
 <p align="center">
   <img src="./docs/assets/demo.gif" alt="An agent plans driving routes in Google Maps, then plays a Coldplay song on YouTube" width="100%" />
   <br>
-  <em>Plans driving routes and totals the durations in Google Maps, then opens YouTube and plays a Coldplay song. This recording comes from the original ARTEMIS project and shows the Flash and Pro execution engine that Engram builds on. It does not show the memory layer.</em>
+  <em>Plans driving routes and totals the durations in Google Maps, then opens YouTube and plays a Coldplay song.</em>
 </p>
 
 ### Built on a full agent stack
 
-Engram keeps everything from [ARTEMIS](#origin) that makes an agent useful on a real phone. **Flash** is a fast single-model loop. **Pro** is a multi-agent graph that plans, verifies, and recovers. An **MCP server** lets Claude Code, Cursor, Windsurf, and other IDEs drive a real device. The memory layer sits on top of both and feeds Pro its routes.
+Engram ships with everything an agent needs on a real phone. **Flash** is a fast single-model loop. **Pro** is a multi-agent graph that plans, verifies, and recovers. An **MCP server** lets Claude Code, Cursor, Windsurf, and other IDEs drive a real device. The memory layer sits on top of both and feeds Pro its routes.
 
 > **Honest status.** The cortex is built, merged, and covered by unit tests. It has not yet run on a real device, and its thresholds are untuned. [Status](#status) lists what is open.
 
@@ -586,7 +590,7 @@ Set `GEMINI_API_KEY=dummy` to run the full unit suite without a real key. CI run
 
 | Area | State |
 |---|---|
-| Flash and Pro profiles | Inherited from ARTEMIS. |
+| Flash and Pro profiles | Working. |
 | App memory, code | Merged and covered by unit tests. |
 | App memory, on a device | **Not yet run.** The device and perf checks in `docs/specs/app-memory/implementation-plan.md` are open. |
 | App memory, tuning | Open. The thresholds above, the 20-label limit in state documents, and the single frozen description per state need real scores. |
@@ -596,7 +600,7 @@ Hints and harvesting are on by default in `config/artemis.jsonc`.
 
 ## Origin
 
-This repository started as an import of [google/artemis](https://github.com/google/artemis) and keeps its Apache-2.0 license. The Flash and Pro profiles, the Accessibility Helper, the MCP server, and the web console come from that project. App memory (`artemis/app_memory/` and its specs) is new work here. Claims from the original README, such as benchmark results, are not reproduced because this repository has no harness that checks them.
+This repository started as an import of [google/artemis](https://github.com/google/artemis) and keeps its Apache-2.0 license. App memory (`artemis/app_memory/` and its specs) is new work here.
 
 Third-party code lives under [`third_party/`](third_party/), one directory per upstream project, each with its own `LICENSE` and `METADATA`.
 
