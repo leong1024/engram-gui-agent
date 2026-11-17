@@ -42,10 +42,11 @@ class Trace:
         pid: int | None = None,
         started_at: float = 1_000.0,
         task_status: str | None = None,
+        goal: str = "goal",
     ) -> "SessionScript":
         metadata = SessionMetadata(
             session_id=session_id,
-            initial_goal="goal",
+            initial_goal=goal,
             start_time=started_at,
             status=status,
             pid=pid,

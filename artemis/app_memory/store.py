@@ -9,6 +9,7 @@ import sqlite_vec
 from artemis.app_memory import ids, queries, schema
 from artemis.app_memory.document_store import DocumentStore
 from artemis.app_memory.graph_store import GraphStore
+from artemis.app_memory.knowledge_store import KnowledgeStore
 from artemis.app_memory.models import (
     AbstractScreen,
     CanonicalAction,
@@ -44,6 +45,7 @@ class MapStore:
         self._conn = conn
         self.documents = DocumentStore(conn)
         self.graph = GraphStore(conn)
+        self.knowledge = KnowledgeStore(conn)
 
     @classmethod
     def open(cls, path: Path) -> "MapStore":
@@ -57,6 +59,18 @@ class MapStore:
             conn.close()
             raise
         return store
+
+    @classmethod
+    def open_read_only(cls, path: Path) -> "MapStore":
+        """Reads an existing file and never writes it. Raises sqlite3.Error when it is missing."""
+        uri = f"{path.resolve().as_uri()}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, timeout=BUSY_TIMEOUT_MS / 1000, isolation_level=None)
+        try:
+            _load_vector_extension(conn)
+        except VectorExtensionError:
+            conn.close()
+            raise
+        return cls(conn)
 
     def close(self) -> None:
         self._conn.close()

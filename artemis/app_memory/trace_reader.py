@@ -1,5 +1,5 @@
 import json
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +44,14 @@ class TraceReader:
             process_alive=row.pid is not None and pid_is_alive(row.pid),
             run_task_status=self._run_task_status(session_id),
         )
+
+    def session_goals(self, session_ids: Iterable[str]) -> dict[str, str]:
+        """Each session's initial goal, in the order given. A session with no goal or no
+        record is left out."""
+        rows = ((session_id, self._storage.get_session(session_id)) for session_id in session_ids)
+        return {
+            session_id: row.initial_goal for session_id, row in rows if row and row.initial_goal
+        }
 
     def steps(self, session_id: str) -> list[HarvestStep]:
         trees: dict[str, Any] = {}
