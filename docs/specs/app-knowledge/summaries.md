@@ -6,6 +6,9 @@ depends_on:
   - ../app-memory/data-model.md
 code:
   - artemis/app_memory/knowledge/
+  - artemis/app_memory/knowledge_queries.py
+  - artemis/app_memory/knowledge_store.py
+  - artemis/app_memory/store.py
   - artemis/app_memory/trace_reader.py
 ---
 
@@ -58,3 +61,43 @@ For one package, the report uses the newest map:
   report still returns.
 - **A map with no described pages**: the report lists no pages, coverage is `sparse`, and the
   text says descriptions are still pending.
+
+## Implementation notes (K1)
+
+K1 follows the code where this note was silent or did not match it. Each item keeps the intent
+of the sections above.
+
+- **Current embedding model.** The configured `provider`, `model` and `dimensions` select the
+  newest matching row of `embedding_models`. A null `dimensions` matches any. This is the lookup
+  enrichment already uses, so no provider is called and no key is needed. A map has vectors when
+  any of its states or edges has an `embeddings` row under that model.
+- **Newest version.** The newest map of a package is the one with the highest `version_code`.
+  An unknown version, `-1`, sorts lowest. Retrieval orders older versions the same way. The
+  overview then sorts these maps by `last_seen_at`.
+- **`last_seen_at`.** A map with no real states falls back to `app_versions.last_seen_at`.
+- **`routes`.** Edges whose stored `confirmed_n` is above zero.
+- **Coverage.** A map with no described pages is `sparse` at any size, as the failure handling
+  above says. That check runs before the page thresholds.
+- **Capabilities and example goals.** Both drop duplicates the same way: by case, after
+  whitespace is collapsed. The first text kept is shown as written, not lowercased. Goals are
+  masked before that check.
+- **Example goals read at most 50 sessions.** The newest 50 completed sessions of the map, by
+  `harvested_sessions.finalized_at`, are read for the 5 goals. This bounds the reads of
+  `data_engine.db`. A `sqlite3.Error` from those reads leaves `example_goals` empty.
+- **Where the reads happen.** `summaries.py` holds pure functions that take the store reads as
+  arguments. `Knowledge` in `service.py` does the reads. It picks the newest version and returns
+  `NotMapped` when there is none. The interface in [interface](interface.md) is unchanged.
+- **Read-only connections.** Both databases open with SQLite's `mode=ro`, and neither file
+  changes. SQLite still creates empty `-wal` and `-shm` files next to a WAL database when no
+  writer holds them, and a read-only connection cannot remove them. The `data_engine.db` reader
+  already behaves this way. See [0004](decisions/0004-derived-read-only.md).
+- **One `Knowledge` per request.** It holds its connections until `close()`, and it is a context
+  manager. A database that was missing when it opened stays missing for it.
+- **Report types.** `recommended_profile` is a `Profile` enum and `level` is a `Level` enum.
+  `other_versions` is a list of `AppSummary`, newest version first. `version_name` is always
+  null today, because nothing writes `app_versions.version_name`. The text shows it only when
+  it is set.
+- **No probe yet.** `KnowledgeResponse` has no `probe` level or field in K1. K2 adds both.
+- **Text order.** The capability report lists capabilities, then example goals, then pages,
+  then other versions. The cut drops list items from the end, so pages and other versions go
+  before capabilities and goals. A cut text says so on the line before the next step.
