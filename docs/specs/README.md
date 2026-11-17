@@ -13,6 +13,7 @@ section notes you need.
 | Feature | Status | Summary |
 |---|---|---|
 | [app-memory](app-memory/README.md) | draft | Cross-run map of app screens and transitions; gives the Pro Operator a known route per milestone. |
+| [app-knowledge](app-knowledge/README.md) | draft | One MCP tool that tells a calling agent which apps Engram knows, what it has seen in each, and whether it knows a route for a goal. |
 
 Cross-feature changes live in [shared/](shared/):
 
