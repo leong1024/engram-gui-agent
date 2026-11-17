@@ -9,6 +9,8 @@ code:
   - artemis/agents/operator/operator.py
   - artemis/agents/operator/prompts.py
   - artemis/sdk/agent.py
+  - artemis/graph/app_memory_targets.py
+  - artemis/data_engine/engine.py
   - artemis/config/agent.py
   - config/artemis.jsonc
 ---
@@ -74,3 +76,14 @@ and waits for the operator's go.
 - **sqlite-vec on all CI platforms.** It must install from wheels on Ubuntu and Windows with
   Python 3.12. If not, retrieval falls back to brute-force numpy (see
   [0006](decisions/0006-embedded-vector-index.md)).
+- **State definition and search method.** How a screen becomes a state and how retrieval
+  searches for a milestone's target were chosen without real scores. Revisit both once runs with
+  real API keys and models give similarity and selector scores to look at.
+- **Label order and the 20-label cutoff.** A state document lists up to 20 static tokens (see
+  [retrieval](retrieval.md)). `static_tokens` is a frozenset, so which 20 survive the cutoff, and
+  in what order, has not been checked.
+- **One frozen description per state.** Each state is described once, from a single sampled
+  screenshot, and never described again. A poor sample stays poor for the life of the map.
+- **Hub screens.** A hub such as the Settings home, which lists "Bluetooth", may score higher
+  for a Bluetooth milestone than the Bluetooth page it leads to.
+- **Retrieval constants.** The 0.35 similarity floor and the top-k of 20 are guesses.
