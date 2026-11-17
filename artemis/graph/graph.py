@@ -37,6 +37,7 @@ from artemis.agents.planner.planner import (
 from artemis.agents.summarizer.summarizer import SummarizerNode
 from artemis.agents.validator.validator import ValidatorNode
 from artemis.context import ArtemisContext
+from artemis.graph.app_memory_targets import add_app_memory_node, request_route_targets
 from artemis.graph.checkpoints import (
     append_ledger_record,
     attempt_trace_id,
@@ -759,6 +760,7 @@ async def _process_plan_write(
         # actual subgoal-hash change (pseudo-switch protection, §3.3).
         _notify_history_chunker(ctx, "queue_boundary_hint")
 
+    request_route_targets(ctx, state, content_after)
     return result
 
 
@@ -1024,7 +1026,7 @@ async def get_graph(ctx: ArtemisContext) -> CompiledStateGraph:
 
     ## Linking nodes
     graph_builder.add_edge(START, "planner")
-    graph_builder.add_edge("planner", CONVERGENCE_NODE)
+    graph_builder.add_edge("planner", add_app_memory_node(graph_builder, ctx))
     graph_builder.add_edge("operator", "execution_check")
     graph_builder.add_conditional_edges(
         "execution_check",
