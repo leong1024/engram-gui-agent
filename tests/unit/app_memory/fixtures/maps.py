@@ -58,17 +58,30 @@ class MapBuilder:
 
     store: MapStore
     map_id: MapId = SETTINGS_MAP
+    session_id: str = "s1"
     _steps: itertools.count = field(default_factory=itertools.count)
 
     @classmethod
     def open(cls, path: Path, map_id: MapId = SETTINGS_MAP) -> "MapBuilder":
         return cls(MapStore.open(path), map_id)
 
-    def state(self, name: str, purpose: str = "", affordances: tuple[str, ...] = ()) -> StateId:
+    def state(
+        self,
+        name: str,
+        purpose: str = "",
+        affordances: tuple[str, ...] = (),
+        *,
+        seen_at: float = NOW,
+    ) -> StateId:
+        state_id = self.seen(name, seen_at=seen_at)
+        self.store.documents.describe_state(state_id, name, purpose or f"{name}.", affordances)
+        return state_id
+
+    def seen(self, name: str, *, seen_at: float = NOW) -> StateId:
+        """A state whose description is still pending."""
         screen = abstract(page(name, self.map_id.package, self.map_id.version_code))
         state_id = ids.state_id(self.map_id, screen.coarse_key)
-        self.store.put_state(self.map_id, state_id, screen, NOW)
-        self.store.documents.describe_state(state_id, name, purpose or f"{name}.", affordances)
+        self.store.put_state(self.map_id, state_id, screen, seen_at)
         return state_id
 
     def outside(self) -> StateId:
@@ -109,7 +122,7 @@ class MapBuilder:
     ) -> None:
         for _ in range(count):
             record = ObservationRecord(
-                session_id="s1",
+                session_id=self.session_id,
                 step_id=str(next(self._steps)),
                 src_state_id=src,
                 action_signature=ids.action_signature([action]),
