@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/assets/brand/engram-banner.png" alt="engram: the self-learning Android agent that remembers every app it touches" width="100%" />
+  <img src="./docs/assets/brand/engram-banner.png" alt="Engram: the self-learning Android agent that remembers every app it touches" width="100%" />
 </p>
 
 <p align="center">
