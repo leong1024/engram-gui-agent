@@ -17,12 +17,17 @@ code:
   - artemis/app_memory/map_graph_cache.py
   - artemis/app_memory/milestones.py
   - artemis/app_memory/launcher.py
+  - artemis/app_memory/plan_routes.py
+  - artemis/app_memory/live_screen.py
+  - artemis/app_memory/trace_reader.py
   - artemis/context.py
   - artemis/sdk/agent.py
   - artemis/data_engine/engine.py
   - artemis/graph/graph.py
+  - artemis/graph/app_memory_targets.py
   - artemis/agents/operator/operator.py
   - artemis/agents/operator/prompts.py
+  - artemis/agents/operator/operator.json
   - artemis/config/agent.py
   - artemis/config/llm.py
   - artemis/config/constants.py
@@ -240,7 +245,34 @@ handling in [services/llm.py](../../../artemis/services/llm.py).
 - **Guard.** `guarded` moved to `guard.py`, so `service.py` stays under 200 lines.
 - **Unit isolation.** `tests/unit/conftest.py` also replaces `open_navigator` with a no-op.
 - **Not wired yet.** Nothing calls `request_targets` or `route_for` in P5. The graph node and the
-  prompt component come in P6.
+  prompt component come in P6 (see below).
+
+## Implementation notes (P6)
+
+- **Modules.** The graph node lives in `artemis/graph/app_memory_targets.py`, not in
+  `graph.py`. `get_graph` links `planner` to whatever `add_app_memory_node` returns: the new
+  node when hints are on, the convergence node otherwise. `_process_plan_write` gains one call
+  to `request_route_targets`, after every check, so a rejected write requests nothing.
+  `artemis/app_memory/plan_routes.py` holds `hints_enabled`, `request_plan_targets` and
+  `route_hint`, shared by the node, the plan write and the prompt component.
+- **Current screen.** `current_screen` (`live_screen.py`) builds the `ScreenObservation` with
+  the trace reader's own builder, now public as `screen_observation`, from identity keys that
+  the new `DataEngine.screen_identity` returns. Those are the keys a step on that screen would
+  be stamped with, so the Operator's screen localizes exactly as a harvested step does.
+- **Config.** The `hints` block has only `enabled`. `max_hops` and `max_rendered_hops` stay
+  constants in `routing/constants.py` and `hints.py`, as the retrieval settings did in P5,
+  because wiring them would thread settings through the planner, navigator and renderer for no
+  behavior change. `AppMemoryConfig.hints_on` is true only when `enabled`, `harvest.enabled` and
+  `hints.enabled` are all true, because routes come from the maps harvesting builds. With hints
+  off, `open_app_memory` opens no navigator.
+- **Placement.** The legacy prompt path has no plan recitation, because the plan is in its
+  system message, so the component comes right after `TemplatePromptComponent` there. The
+  template sentence is gated on the `app_memory_hints` render variable.
+- **Requests.** An empty plan requests nothing, because a request drops the milestones it does
+  not name.
+- **Unit isolation.** `tests/unit/conftest.py` turns hints off for every unit test. Tests that
+  need them use the `hints_on` fixture.
+- **Not checked here.** The live, perf and review-gate boxes need a device and model keys.
 
 ## Testing
 

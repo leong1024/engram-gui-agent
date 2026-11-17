@@ -863,6 +863,15 @@ class DataEngine:
             foreground_app=_derive_foreground_app(ui_tree),
         )
 
+    def screen_identity(self, image_name: str, ui_tree: Any) -> dict[str, Any]:
+        """The identity keys a step acting on this screen would stamp."""
+        extra_metadata: dict[str, Any] = {}
+        app = _derive_foreground_app(ui_tree)
+        if app:
+            extra_metadata["foreground_app"] = app
+        self._stamp_screen_identity(extra_metadata, image_name)
+        return extra_metadata
+
     def _stamp_screen_identity(
         self, extra_metadata: dict[str, Any], pre_image_name: str | None
     ) -> None:

@@ -25,6 +25,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from artemis.tools.history import HISTORY_TOOL_NAMES
 from PIL import Image
 
+from artemis.app_memory.plan_routes import hints_enabled, route_hint
 from artemis.context import ArtemisContext
 from artemis.graph.state import State
 from artemis.tools.command_tool import (
@@ -266,6 +267,7 @@ def _grammar_render_context(ctx: ArtemisContext) -> dict:
         "checks_active": midway or final,
         "midway_checks_active": midway,
         "checkpoint_max_repairs": _checkpoint_max_repairs(ctx),
+        "app_memory_hints": hints_enabled(),
     }
 
 
@@ -403,6 +405,20 @@ class PlanRecitationPromptComponent(PromptComponent):
 
         task_plan = kwargs.get("task_plan") or "No task plan yet."
         builder.add_human_content(f"{PLAN_RECITATION_MARKER}\n{task_plan}")
+
+
+class AppMemoryRoutePromptComponent(PromptComponent):
+    """The advisory route app memory knows for the active milestone. Ephemeral, so only the
+    latest observation carries it and a stale route never stays in the transcript."""
+
+    async def __call__(self, builder: PromptBuilder, state: State, ctx: ArtemisContext, **kwargs):
+        if not hints_enabled():
+            return
+        hint = route_hint(
+            ctx.app_memory, ctx.data_engine, kwargs.get("task_plan"), state.operator_raw_data
+        )
+        if hint:
+            builder.add_human_content(hint, ephemeral=True)
 
 
 class FeedbackPromptComponent(PromptComponent):
