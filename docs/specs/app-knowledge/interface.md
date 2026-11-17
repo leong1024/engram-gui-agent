@@ -44,7 +44,8 @@ missing map:
 
 - `overview() -> Overview`
 - `capabilities(package: str) -> Capabilities | NotMapped`
-- `probe(query: str, package: str | None = None) -> ProbeResult`
+- `async probe(query: str, package: str | None = None) -> ProbeResult`, async because its
+  embedding call is. See the [probe notes](probe.md#implementation-notes-k2).
 
 `render(report) -> str` turns any report into the markdown summary. It picks one render function
 per report type from a table. The MCP tool calls one method, then `render`, and returns both
@@ -61,8 +62,8 @@ parts. A CLI command can be a second adapter on the same module later.
   `pages` (a list of `PageSummary` with `title`, `capabilities` and `visits`),
   `capabilities` (a de-duplicated list), `example_goals`, and `other_versions`.
 - `NotMapped`: `package` and a one-line `reason`.
-- `ProbeResult`: `query`, `status` (`found`, `no_match`, `no_maps`, `no_vectors` or
-  `provider_unavailable`), and `candidates`.
+- `ProbeResult`: `query`, `status` (`found`, `no_match`, `no_maps`, `no_vectors`,
+  `provider_unavailable` or `empty_query`), and `candidates`.
 - `ProbeCandidate`: `package`, `version_code`, `page`, `similarity`, `hops_from_launch` (or
   null when no route exists), and `borrowed`.
 
