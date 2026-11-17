@@ -58,7 +58,7 @@ class TraceReader:
         if image and image not in trees:
             stored = self._storage.get_image(image)
             trees[image] = stored.ui_tree if stored else None
-        screen = _screen(record.extra_metadata, trees.get(image) if image else None)
+        screen = screen_observation(record.extra_metadata, trees.get(image) if image else None)
         sample = StateSample(session_id, str(record.step_id), image)
         return HarvestStep(
             step_id=str(record.step_id),
@@ -77,7 +77,8 @@ class TraceReader:
         return status if isinstance(status, str) else None
 
 
-def _screen(extra: Mapping[str, Any], tree: Any) -> ScreenObservation | None:
+def screen_observation(extra: Mapping[str, Any], tree: Any) -> ScreenObservation | None:
+    """A screen from a step's identity keys and its tree; None when either is missing."""
     package = extra.get("foreground_app")
     if not isinstance(package, str) or not package or not isinstance(tree, list) or not tree:
         return None
