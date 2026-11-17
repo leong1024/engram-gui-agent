@@ -19,6 +19,16 @@ class Level(StrEnum):
     OVERVIEW = "overview"
     CAPABILITIES = "capabilities"
     NOT_MAPPED = "not_mapped"
+    PROBE = "probe"
+
+
+class ProbeStatus(StrEnum):
+    FOUND = "found"
+    NO_MATCH = "no_match"
+    NO_MAPS = "no_maps"
+    NO_VECTORS = "no_vectors"
+    PROVIDER_UNAVAILABLE = "provider_unavailable"
+    EMPTY_QUERY = "empty_query"
 
 
 class FrozenReport(BaseModel):
@@ -67,12 +77,39 @@ class NotMapped(FrozenReport):
     reason: str
 
 
-KnowledgeReport = Overview | Capabilities | NotMapped
+class ProbeCandidate(FrozenReport):
+    """A page whose description is near the query. `similarity` is the vector search's cosine
+    similarity, not a selector's confidence. `borrowed` marks an older version's map."""
+
+    package: str
+    version_code: int
+    page: str
+    similarity: float
+    hops_from_launch: int | None
+    borrowed: bool
+
+
+class ProbeResult(FrozenReport):
+    """`found` holds the closest pages, most similar first. Every other status holds none."""
+
+    query: str
+    status: ProbeStatus
+    candidates: tuple[ProbeCandidate, ...] = ()
+
+    @model_validator(mode="after")
+    def _found_has_candidates(self) -> Self:
+        if (self.status is ProbeStatus.FOUND) != bool(self.candidates):
+            raise ValueError("only a found probe holds candidates, and it holds at least one")
+        return self
+
+
+KnowledgeReport = Overview | Capabilities | NotMapped | ProbeResult
 
 LEVELS: dict[type[KnowledgeReport], Level] = {
     Overview: Level.OVERVIEW,
     Capabilities: Level.CAPABILITIES,
     NotMapped: Level.NOT_MAPPED,
+    ProbeResult: Level.PROBE,
 }
 
 
@@ -83,6 +120,7 @@ class KnowledgeResponse(FrozenReport):
     overview: Overview | None = None
     capabilities: Capabilities | None = None
     not_mapped: NotMapped | None = None
+    probe: ProbeResult | None = None
 
     @classmethod
     def of(cls, report: KnowledgeReport) -> "KnowledgeResponse":
