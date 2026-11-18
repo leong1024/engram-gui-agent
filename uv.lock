@@ -314,7 +314,7 @@ requires-dist = [
     { name = "langchain-openai", specifier = ">=1.0.0" },
     { name = "langgraph", specifier = ">=1.0.2,<2.0.0" },
     { name = "matplotlib", specifier = ">=3.8.0" },
-    { name = "mcp", specifier = ">=1.26.0" },
+    { name = "mcp", specifier = ">=1.26.0,<2" },
     { name = "numpy", specifier = ">=1.26.0" },
     { name = "opencv-python", specifier = ">=4.9.0.80" },
     { name = "pillow", specifier = ">=10.0.0" },
