@@ -94,9 +94,10 @@ of the sections above.
 - **One `Knowledge` per request.** It holds its connections until `close()`, and it is a context
   manager. A database that was missing when it opened stays missing for it.
 - **Report types.** `recommended_profile` is a `Profile` enum and `level` is a `Level` enum.
-  `other_versions` is a list of `AppSummary`, newest version first. `version_name` is always
-  null today, because nothing writes `app_versions.version_name`. The text shows it only when
-  it is set.
+  `other_versions` is a list of `AppSummary`, newest version first. `version_name` comes
+  from the `version_name` each step records. The harvester writes it into `app_versions` when
+  it touches the version, and the latest non-null value it harvests wins. It stays null for a
+  version that no step named. The text shows it only when it is set.
 - **No probe yet.** `KnowledgeResponse` has no `probe` level or field in K1. K2 adds both.
 - **Text order.** The capability report lists capabilities, then example goals, then pages,
   then other versions. The cut drops list items from the end, so pages and other versions go

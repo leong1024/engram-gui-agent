@@ -1,7 +1,8 @@
 TOUCH_VERSION = """
-INSERT INTO app_versions (package, version_code, first_seen_at, last_seen_at)
-VALUES (?, ?, ?, ?)
+INSERT INTO app_versions (package, version_code, version_name, first_seen_at, last_seen_at)
+VALUES (?, ?, ?, ?, ?)
 ON CONFLICT (package, version_code) DO UPDATE SET
+    version_name = COALESCE(excluded.version_name, version_name),
     last_seen_at = MAX(last_seen_at, excluded.last_seen_at)
 """
 
