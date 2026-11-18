@@ -90,10 +90,11 @@ class MapStore:
         screen: AbstractScreen,
         now: float,
         sample: StateSample | None = None,
+        version_name: str | None = None,
     ) -> None:
         params = state_params(map_id, state_id, screen, now, sample)
         with self._transaction() as conn:
-            _touch_version(conn, map_id, now)
+            _touch_version(conn, map_id, now, version_name)
             conn.execute(queries.UPSERT_STATE, params)
 
     def put_outside_state(self, map_id: MapId, now: float) -> StateId:
@@ -188,8 +189,10 @@ def _load_vector_extension(conn: sqlite3.Connection) -> None:
         raise VectorExtensionError(f"sqlite-vec could not be loaded: {exc}") from exc
 
 
-def _touch_version(conn: sqlite3.Connection, map_id: MapId, now: float) -> None:
-    conn.execute(queries.TOUCH_VERSION, (*map_key(map_id), now, now))
+def _touch_version(
+    conn: sqlite3.Connection, map_id: MapId, now: float, version_name: str | None = None
+) -> None:
+    conn.execute(queries.TOUCH_VERSION, (*map_key(map_id), version_name, now, now))
 
 
 def _refresh_counts(conn: sqlite3.Connection, edge_ids: Iterable[str | None]) -> None:

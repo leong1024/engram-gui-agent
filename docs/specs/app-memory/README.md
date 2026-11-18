@@ -26,9 +26,9 @@ an advisory hint. Execution itself is unchanged.
 
 ## Status
 
-Draft. Design agreed in conversation on 2026-11-16. The
-[implementation plan](implementation-plan.md) splits the build into six stacked PRs, P1 to P6,
-and waits for the operator's go.
+The code for P1 to P6 of the [implementation plan](implementation-plan.md) is merged on `main`
+and covered by unit tests. The live device lanes and tuning on real data are still pending, so
+the spec stays a draft. Design agreed in conversation on 2026-11-16.
 
 ## Reading order
 

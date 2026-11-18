@@ -65,7 +65,9 @@ class MapWriter:
             ordinal = sum(1 for k in known if k.screen.coarse_key == screen.coarse_key)
             state_id = ids.state_id(map_id, screen.coarse_key, ordinal)
             known.append(KnownState(state_id, screen))
-        self._store.put_state(map_id, state_id, screen, now, sighting.sample)
+        self._store.put_state(
+            map_id, state_id, screen, now, sighting.sample, sighting.screen.version_name
+        )
         return state_id
 
     def _observe(

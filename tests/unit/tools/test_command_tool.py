@@ -15,6 +15,7 @@
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 from artemis.context import ArtemisContext
+from artemis.runtime.app_versions import AppVersionCache
 from artemis.tools.command_tool import (
     get_adb_task_registry,
     get_manage_task_tool,
@@ -22,6 +23,13 @@ from artemis.tools.command_tool import (
     get_run_short_adb_command_tool,
 )
 import pytest
+
+from tests.unit.runtime.app_version_fakes import (
+    LISTING_V34,
+    LISTING_V35,
+    FakeShell,
+    QueuedExecutor,
+)
 
 
 class MockProcess:
@@ -791,3 +799,28 @@ async def test_adb_commands_reach_the_app_version_cache(mock_exec, get_tool, moc
     mock_ctx.data_engine.app_versions.note_adb_command.assert_called_once_with(
         "pm install -r /data/local/tmp/app.apk"
     )
+
+
+@pytest.mark.asyncio
+@patch("asyncio.create_subprocess_exec")
+async def test_an_install_that_moves_to_the_background_invalidates_when_it_ends(
+    mock_exec, mock_ctx
+):
+    mock_exec.return_value = MockProcess(output_bytes=b"Success\n", exit_code=0, delay=0.3)
+    executor = QueuedExecutor()
+    cache = AppVersionCache(FakeShell([LISTING_V34, LISTING_V35]), executor=executor)
+    mock_ctx.data_engine = MagicMock()
+    mock_ctx.data_engine.app_versions = cache
+
+    res = await get_run_adb_command_tool(mock_ctx).ainvoke(
+        {"CommandLine": "pm install -r /data/local/tmp/app.apk", "WaitMsBeforeAsync": 50}
+    )
+    assert "sent to the background" in res
+    cache.lookup("com.android.settings")
+    executor.run_all()
+    assert cache.lookup("com.android.settings").code == 34
+
+    await asyncio.sleep(0.5)
+    assert cache.lookup("com.android.settings").code is None
+    executor.run_all()
+    assert cache.lookup("com.android.settings").code == 35

@@ -20,8 +20,9 @@ knows a route for a given goal. Every answer is read from the app-memory databas
 
 ## Status
 
-Draft. Agreed in conversation on 2026-11-17. The [implementation plan](implementation-plan.md)
-splits the build into stacked PRs.
+The code for K1 to K3 of the [implementation plan](implementation-plan.md) is merged on `main`
+and covered by unit tests. The live device lanes and tuning on real maps are still pending, so
+the spec stays a draft. Agreed in conversation on 2026-11-17.
 
 ## Reading order
 

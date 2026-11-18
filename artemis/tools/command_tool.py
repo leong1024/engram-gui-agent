@@ -469,6 +469,7 @@ class BackgroundTask:
             output=output_text,
         )
         registry.background.pop(self.task_id, None)
+        _note_adb_command(ctx, self.command)
 
     async def _listen(self, ctx: ArtemisContext):
         """Reads process output streams and updates lifecycle status."""

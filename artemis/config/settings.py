@@ -25,7 +25,6 @@ from artemis.config.constants import (
     DEFAULT_ADB_HOST,
     DEFAULT_ADB_PORT,
     DEFAULT_MODEL,
-    DEFAULT_PROFILE,
     ENV_ANTHROPIC_API_KEY,
     ENV_DATA_ENGINE_DB_PATH,
     ENV_GCP_API_KEY,
@@ -122,7 +121,6 @@ class Settings(BaseSettings):
 
     # Execution Defaults
     PROJECT_NAME: str | None = None
-    ARTEMIS_DEFAULT_PROFILE: str = Field(default=DEFAULT_PROFILE)
     ARTEMIS_DEFAULT_MODEL: str = Field(default=DEFAULT_MODEL)
 
     # Explorer Tool Settings (the tier itself is configured in artemis.jsonc or

@@ -11,6 +11,7 @@ from mcp.types import CallToolResult, Tool
 import mcp_server.tools.knowledge as knowledge_tool
 from mcp_server.base import mcp
 from mcp_server import tools
+from mcp_server.utils import env_utils
 from artemis.app_memory import store as map_store
 from artemis.app_memory.knowledge import open_knowledge, render
 from artemis.app_memory.knowledge import service as knowledge_service
@@ -38,7 +39,7 @@ TRUNK_TOOLS = (
 def traces(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """An empty traces directory the tool reads, with the hash embedder and default config."""
     monkeypatch.setattr(trace_store, "TRACES_DIR", str(tmp_path))
-    monkeypatch.setattr(knowledge_tool.env_utils, "get_project_root", lambda: str(tmp_path))
+    monkeypatch.setattr(env_utils, "get_project_root", lambda: str(tmp_path))
     fake = provider()
     opener = functools.partial(open_knowledge, config=CONFIG, embedder=lambda: fake)
     monkeypatch.setattr(knowledge_tool, "open_knowledge", opener)

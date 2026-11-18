@@ -169,7 +169,9 @@ in-process SDK runs often have no Daemon, so reconciling in `prepare_run` covers
 
 `artemis app-memory backfill [--session ID | --all]` runs live and post-run harvesting over
 sessions already in `data_engine.db`, using their recorded outcome. It is idempotent: an
-existing `(session_id, step_id)` observation is skipped. Old sessions of both profiles harvest
+existing `(session_id, step_id)` observation is skipped. It only harvests: it neither describes
+nor embeds, and the next run's `prepare_run` queues the rows it left pending (see
+[retrieval](retrieval.md)). Old sessions of both profiles harvest
 without activity or version, and land in the `version_code = -1` bucket. Old Flash sessions are
 not skipped: their step rows recorded the post-action text, but the `images` row of each
 `pre_image_name` holds the structured pre-action tree, because `observe` stored it first and

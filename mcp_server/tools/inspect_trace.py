@@ -21,7 +21,8 @@ import sys
 from typing import Any
 
 from mcp_server.base import mcp
-from mcp_server.utils import env_utils
+from mcp_server.utils.traces import resolve_traces_dir
+from artemis.app_memory.trace_reader import DATA_ENGINE_DB
 from artemis.data_engine.history_reader import OfflineHistoryReader
 from artemis.runtime import trace_store
 from artemis.tools.history import load_step_screenshot, replay_steps_text, search_history_text
@@ -97,10 +98,7 @@ async def mobile_inspect_trace(
           `"search"`.
         max_results: Maximum `"search"` hits to return (server-side cap applies).
     """
-    project_root = env_utils.get_project_root()
-    db_path = os.path.join(trace_store.TRACES_DIR, "data_engine.db")
-    if not os.path.exists(db_path):
-        db_path = os.path.join(project_root, "traces", "data_engine.db")
+    db_path = str(resolve_traces_dir() / DATA_ENGINE_DB)
 
     if not os.path.exists(db_path):
         return {

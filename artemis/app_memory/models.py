@@ -57,6 +57,7 @@ class ScreenObservation:
     dhash: str | None = None
     ocr_tokens: frozenset[str] = frozenset()
     screen_size: tuple[int, int] | None = None
+    version_name: str | None = None
 
     @property
     def map_id(self) -> MapId:

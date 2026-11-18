@@ -4,10 +4,13 @@ import pytest
 
 from artemis.app_memory.abstraction.constants import SYSTEM_UI_PACKAGES
 from artemis.app_memory.harvester import Harvester
+from artemis.app_memory.knowledge import open_knowledge
+from artemis.app_memory.knowledge.reports import Capabilities
 from artemis.app_memory.store import MapStore
 from artemis.app_memory.trace_reader import TraceReader
 
 from artemis.app_memory.models import SessionOutcome
+from artemis.config.agent import AppMemoryConfig
 from tests.unit.app_memory.fixtures import screens
 from tests.unit.app_memory.fixtures.parts import CLOCK, SETTINGS
 from tests.unit.app_memory.fixtures.sessions import NOW, five_step_session, nav
@@ -126,3 +129,22 @@ def test_steps_in_an_excluded_package_open_nothing(trace, harvest, view):
     harvest().harvest_live("s1")
 
     assert view.observations("s1") == []
+
+
+def test_the_recorded_version_name_reaches_the_knowledge_reports(trace, harvest):
+    first = trace.session("s1")
+    first.step(screens.clock("Alarm"), tap(nav("Timer")), version_name="14.2")
+    first.step(screens.clock("Timer"), version_name="14.2")
+    later = trace.session("s2")
+    later.step(screens.clock("Timer"), tap(nav("Alarm")))
+    later.step(screens.clock("Alarm"))
+    harvester = harvest()
+    harvester.backfill("s1")
+    harvester.backfill("s2")
+
+    with open_knowledge(trace.root, AppMemoryConfig()) as knowledge:
+        overview = knowledge.overview()
+        capabilities = knowledge.capabilities(CLOCK)
+    assert [(app.package, app.version_name) for app in overview.apps] == [(CLOCK, "14.2")]
+    assert isinstance(capabilities, Capabilities)
+    assert capabilities.app.version_name == "14.2"

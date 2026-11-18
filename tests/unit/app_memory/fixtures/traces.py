@@ -72,6 +72,7 @@ class SessionScript:
         *actions: Action,
         package: str = CLOCK,
         status: str | None = "dispatched",
+        version_name: str | None = None,
     ) -> str:
         self._steps += 1
         image = self._image(screen) if screen is not None else None
@@ -84,7 +85,12 @@ class SessionScript:
             pre_image_name=image,
             action_taken=list(actions),
             last_execution_result={"status": status} if status else None,
-            extra_metadata={"foreground_app": package, "activity": ".Main", "version_code": 1},
+            extra_metadata={
+                "foreground_app": package,
+                "activity": ".Main",
+                "version_code": 1,
+                "version_name": version_name,
+            },
         )
         self._storage.create_step(record)
         return step_id

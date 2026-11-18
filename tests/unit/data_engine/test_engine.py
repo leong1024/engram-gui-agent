@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 from unittest.mock import MagicMock, patch
@@ -20,7 +21,8 @@ from unittest.mock import MagicMock, patch
 from artemis.context import ArtemisContext
 from artemis.controllers.device_controller import ScreenDataResponse
 from artemis.data_engine.engine import DataEngine
-from artemis.runtime.app_versions import AppVersion
+from artemis.runtime.app_versions import AppVersion, AppVersionCache
+from tests.unit.runtime.app_version_fakes import LISTING_V34, FakeShell
 
 
 def test_ipc_send_reconnects_and_retries_current_event(tmp_path):
@@ -701,3 +703,15 @@ def test_pro_pixel_record_is_normalized_exactly_once(tmp_path):
 
     again = normalize_any_structure(row["action_taken"], 1080, 2400)
     assert again == row["action_taken"]
+
+
+def test_shutdown_closes_the_version_cache_so_no_adb_runs_after_it(tmp_path):
+    engine = _foreground_engine(tmp_path)
+    shell = FakeShell([LISTING_V34])
+    engine.app_versions = AppVersionCache(shell, executor=ThreadPoolExecutor(max_workers=1))
+
+    asyncio.run(engine.shutdown())
+    asyncio.run(engine.shutdown())
+
+    assert engine.app_versions.lookup("com.android.settings") == AppVersion()
+    assert shell.commands == []

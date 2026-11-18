@@ -91,6 +91,7 @@ def screen_observation(extra: Mapping[str, Any], tree: Any) -> ScreenObservation
     if not isinstance(package, str) or not package or not isinstance(tree, list) or not tree:
         return None
     version = extra.get("version_code")
+    version_name = extra.get("version_name")
     width, height = extra.get("width"), extra.get("height")
     return ScreenObservation(
         package=package,
@@ -99,4 +100,5 @@ def screen_observation(extra: Mapping[str, Any], tree: Any) -> ScreenObservation
         elements=tuple(element for element in tree if isinstance(element, Mapping)),
         dhash=extra.get("pre_image_dhash"),
         screen_size=(width, height) if isinstance(width, int) and isinstance(height, int) else None,
+        version_name=version_name if isinstance(version_name, str) and version_name else None,
     )
