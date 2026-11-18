@@ -93,7 +93,7 @@ flowchart LR
     subgraph IN["Front doors"]
         CLI["CLI<br/>artemis run, ui, doctor"]
         WEB["Web console<br/>Angular + FastAPI :8000"]
-        MCPS["MCP server<br/>5 tools for IDEs"]
+        MCPS["MCP server<br/>6 tools for IDEs"]
         SDK["Python SDK<br/>artemis-client"]
     end
 
@@ -320,7 +320,7 @@ flowchart LR
         C["Claude Code, Cursor,<br/>Antigravity, Windsurf, Codex"]
     end
     subgraph A["mcp_server/ (front door)"]
-        T["mobile_run_task<br/>mobile_manage_task<br/>mobile_get_device_state<br/>mobile_inspect_trace<br/>mobile_diagnose"]
+        T["mobile_run_task<br/>mobile_manage_task<br/>mobile_get_device_state<br/>mobile_inspect_trace<br/>mobile_get_knowledge<br/>mobile_diagnose"]
     end
     subgraph B["artemis/mcp/ (inside a task)"]
         AX["Action server<br/>click_sequence, swipe, ..."]
@@ -333,6 +333,7 @@ flowchart LR
 ```
 
 - `mcp_server/` is what your IDE connects to. `mobile_run_task` starts a detached worker and returns, and `mobile_manage_task` checks status, stops, or injects an instruction.
+- `mobile_get_knowledge` tells an agent which apps Engram knows, what it has seen done in each, and whether it knows a route for a goal. It reads `app_memory.db` only. Spec in [`docs/specs/app-knowledge/`](docs/specs/app-knowledge/README.md).
 - `artemis/mcp/` is how agents touch the device during a task. It runs in memory with no network.
 - `artemis mcp --install <client>` writes the config and the behavior rules in `mcp_server/rules.md` for a given IDE. Details are in [`mcp_server/README.md`](mcp_server/README.md).
 
