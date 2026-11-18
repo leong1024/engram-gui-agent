@@ -95,3 +95,31 @@ The limits are named constants in the module:
 - **Database unreadable or locked past its timeout**: the tool returns an MCP error result
   with the reason. It does not retry.
 - **Both arguments empty strings**: treated as absent.
+
+## Implementation notes (K3)
+
+K3 follows the code where this note was silent or did not match it. Each item keeps the intent
+of the sections above.
+
+- **Error results are raised, not returned.** In `mcp` 1.29, FastMCP validates a returned
+  `CallToolResult` against the output model, even when `isError` is set. An error result has
+  no report, so that check fails and replaces the reason with a validation message. The tool
+  raises FastMCP's `ToolError` instead. FastMCP turns it into a result with `isError` set and
+  the text `Error executing tool mobile_get_knowledge: <reason>`, with no stack trace.
+- **Two failure reasons.** An unreadable or locked `app_memory.db` (`sqlite3.Error`,
+  `OSError`, or a failed `sqlite-vec` load) reads as "Engram's app-memory database could not be
+  read", followed by the SQLite message. A config file that does not parse when `open_knowledge`
+  loads it reads as "Engram's config could not be read". Only those exception types are caught.
+- **Locked means locked to a reader.** `app_memory.db` runs in WAL mode, so a writer's
+  `BEGIN EXCLUSIVE` does not block a reader. A reader waits only when the writer also sets
+  `PRAGMA locking_mode = EXCLUSIVE` and writes, or the file uses a rollback journal. The read
+  then fails after the store's 30-second busy timeout. Lane 6 holds the lock that way.
+- **One `Knowledge` per call.** Each call opens the databases read-only, builds one report, and
+  closes them before it returns.
+- **Traces directory.** The tool repeats the rule in `mcp_server/tools/inspect_trace.py`: the
+  configured traces directory, or the project's `traces/` when only that one holds
+  `data_engine.db`. K3's file boundary leaves `inspect_trace.py` unchanged, so the rule is not
+  shared yet.
+- **Caller guidance.** `mcp_server/rules.md` gains one line, and the `mobile_run_task`
+  description gains one line that points to the tool. The server instructions in
+  `mcp_server/base.py` still list five tools, because that file is outside K3's boundary.

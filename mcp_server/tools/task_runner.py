@@ -233,6 +233,7 @@ def mobile_run_task(
       monitoring/polling; tasks needing ADB shell, system logs, verified
       checkpoints, multi-step planning, or detailed written output (via notes
       and `expected_output_desc`).
+    - Call `mobile_get_knowledge` first: only Pro uses the app routes it reports.
 
     Timing is not precise: the agent's own inference adds ~5 s per step (Flash)
     or ~30 s per turn (Pro) on top of any requested waits — account for this
