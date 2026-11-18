@@ -38,6 +38,7 @@ mcp = FastMCP(
         "mobile_manage_task to check status or steer execution, "
         "mobile_get_device_state to inspect real-time device screen/hierarchy, "
         "mobile_inspect_trace to inspect detailed execution steps and visual action overlays, "
+        "mobile_get_knowledge to ask what Engram already knows about an app before running a task, "
         "and mobile_diagnose whenever a tool errors, no device is found, or the user says "
         "ARTEMIS is not working: it checks the environment and returns ordered fix steps."
     ),
