@@ -322,7 +322,7 @@ Each live lane runs in its own worktree at the PR head. Drive through the skill 
 - [ ] Lane 2. Read the Settings home description. Save `p4-describe.png`. Pass when the title and purpose describe the screen and name no device-specific value.
 - [ ] Lane 3. Run Flash "Open Messages". Save `p4-privacy.png`. Pass when no description contains a contact name, a number, or message text visible in the screenshot.
 - [ ] Lane 4. Count rows in the `vec_` table. Save `p4-vectors.png`. Pass when the count equals the number of ready states and edges.
-- [ ] Lane 5. Switch `embedding.provider` to a second configured provider and run `backfill --all`. Save `p4-provider-switch.png`. Pass when a second `vec_` table fills and the first is unchanged.
+- [ ] Lane 5. Switch `embedding.provider` to a second configured provider and start a device run. `backfill --all` only harvests, so it fills no `vec_` table. The run's `prepare_run` queues the ready rows that have no vector for the new model. Save `p4-provider-switch.png`. Pass when a second `vec_` table fills and the first is unchanged.
 - [ ] Lane 6. Remove the Gemini key and run a device task. Save `p4-no-key.png`. Pass when the run succeeds and descriptions stay `pending` with one warning in the log.
 - [ ] Lane 7. Exit a run while describer jobs are queued, then start a new run. Save `p4-requeue.png`. Pass when the new run's `prepare_run` completes the earlier `pending` rows.
 - [ ] Lane 8. Override `nodes.app_memory_describer` in `config/artemis.jsonc` with a different model. Save `p4-node-override.png`. Pass when the `llm_call` traces of the describer name the override model.
