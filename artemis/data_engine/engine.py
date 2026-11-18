@@ -1140,6 +1140,8 @@ class DataEngine:
     async def shutdown(self):
         """Wait for all pending background tasks and threads to complete."""
         await self.wait_for_writes()
+        if self.app_versions is not None:
+            self.app_versions.close()
 
         with self._ipc_socket_lock:
             self._ipc_shutdown = True
