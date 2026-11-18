@@ -15,19 +15,16 @@
 """MCP Tool: mobile_get_knowledge."""
 
 import sqlite3
-from pathlib import Path
 from typing import Annotated
 
 from mcp.server.fastmcp.exceptions import ToolError
 from mcp.types import CallToolResult, TextContent
 
 from mcp_server.base import mcp
-from mcp_server.utils import env_utils
+from mcp_server.utils.traces import resolve_traces_dir
 from artemis.app_memory.knowledge import Knowledge, open_knowledge, render
 from artemis.app_memory.knowledge.reports import KnowledgeReport, KnowledgeResponse
 from artemis.app_memory.store import VectorExtensionError
-from artemis.app_memory.trace_reader import DATA_ENGINE_DB
-from artemis.runtime import trace_store
 
 DATABASE_ERRORS = (sqlite3.Error, OSError, VectorExtensionError)
 
@@ -74,7 +71,7 @@ async def mobile_get_knowledge(
 
 def _open() -> Knowledge:
     try:
-        return open_knowledge(_traces_dir())
+        return open_knowledge(resolve_traces_dir())
     except ValueError as exc:
         raise ToolError(f"Engram's config could not be read: {exc}") from exc
 
@@ -89,12 +86,3 @@ async def _report(knowledge: Knowledge, app: str | None, query: str | None) -> K
 
 def _present(value: str | None) -> str | None:
     return (value or "").strip() or None
-
-
-def _traces_dir() -> Path:
-    """The directory `mobile_inspect_trace` reads, so both tools see the same runs."""
-    configured = Path(trace_store.TRACES_DIR)
-    fallback = Path(env_utils.get_project_root()) / "traces"
-    if not (configured / DATA_ENGINE_DB).exists() and (fallback / DATA_ENGINE_DB).exists():
-        return fallback
-    return configured
